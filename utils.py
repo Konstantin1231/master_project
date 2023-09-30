@@ -1,0 +1,80 @@
+"""
+        RUN EPISODES (NON TD)
+"""
+from enviroment import *
+import torch
+import numpy as np
+# Collect episodes using the current policy.
+def run_episodes_mtr(policy, env, n_episodes=1, horizon=100):
+    # Initialize the run counter and an empty list to store episodes
+    run = 0
+    episodes = []
+
+    # Determine the dimensionality of the observation space and define the input vector size
+    ObsSpaceDim = env.observation_space.shape[0]
+    nInput = ObsSpaceDim + 1
+
+    # Run episodes until the specified number of episodes is reached
+    while (run < n_episodes):
+        # Initialize variables for each episode
+        episode = []
+        state = env.reset()
+        state = state[0]
+        i = 0
+        truncated = False
+        terminated = False
+        # Run each episode until it is terminated or the horizon is reached
+        while (not terminated and i < horizon):
+            # Initialize the input vector and set its elements
+            input_vector = np.zeros(nInput)
+            input_vector[:ObsSpaceDim] = state
+            input_vector[-1] = (horizon - i) / horizon
+
+            # Convert the input vector to a PyTorch tensor and compute action probabilities using the policy
+            input_vector_tensor = torch.tensor(input_vector, dtype=torch.float)
+            with torch.no_grad():
+                probs = policy(input_vector_tensor)
+
+            # Sample an action according to the computed probabilities
+            action = torch.multinomial(probs, num_samples=1).item()
+
+            # Execute the sampled action in the environment and observe the next state, reward, and termination signal
+            next_state, reward, terminated, truncated, info = run_env_step(env, action=action, random_action=False)
+
+            # Append the experience tuple to the episode
+            episode.append((input_vector, action, reward, probs[action].detach().numpy()))
+
+            # Update the current state and time step
+            state = next_state
+            i += 1
+
+        # Append the completed episode to the list of episodes
+        episodes.append(episode)
+        run += 1
+
+    # Return the list of episodes
+    return episodes
+
+
+# Collect episodes using the current policy.
+def run_episodes(policy, env, n_episodes=1, limit = 100):
+    run = 0
+    episodes = []
+    while(run<n_episodes):
+        episode = []
+        truncated =  False
+        terminated = False
+        state = env.reset()
+        state = state[0]
+        i = 1
+        while(not terminated and i < limit):
+            state_tensor = torch.FloatTensor(state).unsqueeze(0)
+            probs = policy(state_tensor)
+            action = torch.multinomial(probs, num_samples=1).item()
+            next_state, reward, terminated, truncated, info = run_env_step(env,action=action, random_action=False)
+            episode.append((state, action, reward))
+            state = next_state
+        episodes.append(episode)
+        i+=1
+        run += 1
+    return episodes
