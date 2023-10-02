@@ -80,7 +80,7 @@ class PolicyNet(nn.Module):
             print(torch.norm(self.state_dict()[layer]))
 
     def rescale_weights(self, gamma=1.0):
-        print("Rescalling weights")
+        print("Recalling weights")
         for layer in self.state_dict():
             if len(self.state_dict()[layer].shape) == 2:
                 _, input_size = self.state_dict()[layer].shape
