@@ -8,6 +8,18 @@ import pickle
 # Step 1: Set up the environment.
 env = gym.make('CartPole-v1')
 
+# Adding Cunstom loss, to ensure that optimizer works correctly
+class CustomLoss(nn.Module):
+    """ to simplify the gradient computation and applying log to the output of the  network"""
+    def __init__(self, C):
+        super().__init__()
+        self.C = C
+    def forward(self, outputs: torch.Tensor):
+        """
+        :param C: we pass parameter C, to be sure that optimizer see it.
+        """
+        return torch.log(outputs)*self.C
+
 
 # Step 2: Define the policy model.
 # A neural network which, given a state, outputs a probability distribution over actions.
@@ -18,16 +30,14 @@ class PolicyNet(nn.Module):
         self.fc = nn.Sequential(
             nn.Linear(n_inputs, hidden_dim),  # Input layer
             nn.ReLU(),  # Activation function
-            nn.Linear(hidden_dim, hidden_dim),  # hidden layer
-            nn.ReLU(),  # Activation function
             nn.Linear(hidden_dim, n_outputs),  # Output layer
         )
         self.output_size = n_outputs
-
+        self.softmax = nn.Softmax(dim=-1)
     def forward(self, x, tau=1):
-        logits = nn.Sequential(nn.Softmax())(self.fc(x) / tau)  # dividing by tau before
+        x = self.fc(x) # dividing by tau before
         # we apply softmax
-        return logits
+        return self.softmax(x/tau)
 
     # Initialize weights of NN according to the scheme presented on the  page 102 EPFL_TH9825.pdf
     def ntk_init(self, beta=0.5):
@@ -99,10 +109,9 @@ class PolicyNet(nn.Module):
             self.state_dict()[layer] = weights_state_dict[layer]
 
 
-def train_policy_mtr(policy, optimizer, episodes, gamma=0.99, tau=1):
+def train_policy_mtr(policy, optimizer, episodes, gamma=0.99, tau=1, clip_grad = True):
     # Initialize total_loss to store cumulative loss over all episodes
     total_loss = 0
-
     # Iterate over each episode in episodes
     for episode in episodes:
         # Initialize lists to store rewards and action probabilities for the episode
@@ -129,21 +138,24 @@ def train_policy_mtr(policy, optimizer, episodes, gamma=0.99, tau=1):
         actions_tensor = torch.LongTensor(actions)
 
         # Compute the log probabilities of the actions using the policy
-        # Select the log probabilities corresponding to the taken actions
-        log_probs = torch.log(policy(input_vector_tensor))
-        picked_log_probs = log_probs[range(len(actions)), actions_tensor]
+        # Select the  probabilities corresponding to the taken actions
+        probs = policy(input_vector_tensor)
+        picked_log_probs = probs[range(len(actions)), actions_tensor]
+        picked_log_probs = torch.flip(picked_log_probs, dims=[0])
+        for i in range(len(C)):
+            loss = CustomLoss(C[i])
+            # Compute the policy gradient loss
+            loss(picked_log_probs[i])
+            # Perform backpropagation and optimization step
+            # Corresponds to the update of policy parameters in Algorithm 1
+            optimizer.zero_grad()
+            loss.backward()
+            if clip_grad == True:
+                torch.nn.utils.clip_grad_value_(policy.parameters(), clip_value=10)
+            optimizer.step()
+            # Accumulate the loss
+            total_loss += loss.item()
 
-        # Compute the policy gradient loss
-        loss = torch.sum(torch.flip(picked_log_probs, dims=[0]) * C)
-
-        # Perform backpropagation and optimization step
-        # Corresponds to the update of policy parameters in Algorithm 1
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
-
-        # Accumulate the loss
-        total_loss += loss.item()
 
     # Return the average loss across all episodes
     return total_loss / len(episodes)

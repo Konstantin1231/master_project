@@ -4,8 +4,10 @@
 from enviroment import *
 import torch
 import numpy as np
+
+
 # Collect episodes using the current policy.
-def run_episodes_mtr(policy, env, n_episodes=1, horizon=100, obs_dim = 1, game = "Frozen"):
+def run_episodes_mtr(policy, env, n_episodes=1, horizon=100, obs_dim=1, game="Frozen"):
     # Initialize the run counter and an empty list to store episodes
     run = 0
     episodes = []
@@ -18,7 +20,7 @@ def run_episodes_mtr(policy, env, n_episodes=1, horizon=100, obs_dim = 1, game =
     while (run < n_episodes):
         # Initialize variables for each episode
         episode = []
-        state, _ = initialize_env(env, obs_dim = obs_dim)
+        state, _ = initialize_env(env, obs_dim=obs_dim)
         i = 0
         truncated = False
         terminated = False
@@ -56,26 +58,31 @@ def run_episodes_mtr(policy, env, n_episodes=1, horizon=100, obs_dim = 1, game =
 
 
 # Collect episodes using the current policy.
-def run_episodes(policy, env, n_episodes=1, limit = 100, obs_dim = 1, game = "Frozen"):
+def run_episodes(policy, env, n_episodes=1, limit=1000000, obs_dim=1, game="Frozen", epsilon_greedy=0):
     run = 0
     episodes = []
-    while(run<n_episodes):
+    while (run < n_episodes):
         episode = []
-        truncated =  False
+        truncated = False
         terminated = False
-        state, _ = initialize_env(env, obs_dim = obs_dim)
+        state, _ = initialize_env(env, obs_dim=obs_dim)
         i = 1
-        while(not terminated and i < limit):
+        while (not terminated and i < limit):
             state_tensor = torch.tensor(state, dtype=torch.float)
             probs = policy(state_tensor)
             action = torch.multinomial(probs, num_samples=1).item()
-            next_state, reward, terminated, truncated, info = run_env_step(env,action=action, random_action=False, obs_dim = obs_dim)
-            reward_new = custom_reward(state,reward, terminated, game = game)
+            if np.random.uniform() < epsilon_greedy:
+                next_state, reward, terminated, truncated, info = run_env_step(env, action=action, random_action=True,
+                                                                               obs_dim=obs_dim)
+            else:
+                next_state, reward, terminated, truncated, info = run_env_step(env, action=action, random_action=False,
+                                                                               obs_dim=obs_dim)
+            reward_new = custom_reward(state, reward, terminated, game=game)
             if terminated:
-                print(reward, reward_new)
+                pass
             episode.append((state, action, reward_new))
             state = next_state
         episodes.append(episode)
-        i+=1
+        i += 1
         run += 1
     return episodes

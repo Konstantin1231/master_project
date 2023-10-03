@@ -17,17 +17,16 @@ class PolicyNet(nn.Module):
         self.fc = nn.Sequential(
             nn.Linear(n_inputs, hidden_dim),  # Input layer
             nn.ReLU(),  # Activation function
-            nn.Linear(hidden_dim, hidden_dim),  # hidden layer
-            nn.ReLU(),  # Activation function
-            nn.Linear(hidden_dim, n_outputs),  # Output layer
+            nn.Linear(hidden_dim, n_outputs),
         )
+        self.softmax = nn.Softmax(dim=-1)
         self.output_size = n_outputs
 
 
     def forward(self, x, tau=1):
-        logits = nn.Sequential(nn.Softmax())(self.fc(x) / tau)  # dividing by tau before
+        x = self.fc(x) # dividing by tau before
         # we apply softmax
-        return logits
+        return self.softmax(x/tau)
 
     # Initialize weights of NN according to the scheme presented on the  page 102 EPFL_TH9825.pdf
     def ntk_init(self, beta=0.5):
@@ -100,7 +99,7 @@ class PolicyNet(nn.Module):
 
 
 # Step 4: Calculate returns for each episode and update the policy.
-def train_policy(policy, optimizer, episodes, gamma=0.99):
+def train_policy(policy, optimizer, episodes, gamma=0.99, clip_grad= True ):
     total_loss = 0
     for episode in episodes:
         returns = []  # List to store the returns for each step
@@ -124,6 +123,8 @@ def train_policy(policy, optimizer, episodes, gamma=0.99):
         # Perform backpropagation and optimization step
         optimizer.zero_grad()
         loss.backward()
+        if clip_grad == True:
+            torch.nn.utils.clip_grad_value_(policy.parameters(), clip_value=6)
         optimizer.step()
 
         total_loss += loss.item()

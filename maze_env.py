@@ -4,11 +4,13 @@ import numpy as np
 
 
 class CustomMazeEnv(gym.Env):
-    def __init__(self):
+    def __init__(self, maze_size=5, reward_pos=(4, 4), wall_pose = (2,2), reward = 1):
         super(CustomMazeEnv, self).__init__()
 
         # Define the maze dimensions (e.g., 5x5 grid)
-        self.grid_size = 5
+        self.grid_size = maze_size
+        self.reward_pose = reward_pos
+        self.reward  = reward
         self.observation_space = spaces.Discrete(self.grid_size * self.grid_size)
 
         # Define action space (up, down, left, right)
@@ -19,7 +21,7 @@ class CustomMazeEnv(gym.Env):
 
         # Define the maze layout (0: empty, 1: obstacle)
         self.maze = np.zeros((self.grid_size, self.grid_size))
-        self.maze[2, 2] = 1  # Example obstacle
+        self.maze[wall_pose[0], wall_pose[1]] = 1  # Example obstacle
 
     def step(self, action):
         # Implement the dynamics of the maze
@@ -39,14 +41,14 @@ class CustomMazeEnv(gym.Env):
                 self.agent_position = new_position
 
         # Define a simple reward structure (e.g., reaching a goal)
-        if self.agent_position == (4, 4):
-            reward = 1.0  # Agent reaches the goal
+        if self.agent_position == self.reward_pose:
+            reward = self.reward  # Agent reaches the goal
             done = True
         else:
             reward = 0.0
             done = False
 
-        return self.agent_position, reward, done, {}
+        return self.agent_position, reward, done, {}, {}
 
     def reset(self):
         # Reset the agent's position to the starting point
@@ -65,8 +67,8 @@ class CustomMazeEnv(gym.Env):
                     print("#", end=" ")  # Wall
                 else:
                     print(".", end=" ")  # Open space
-            print()  # Newline to separate rows
-
+            print()# Newline to separate rows
+        print()
 
 
 # Create an instance of the custom maze environment

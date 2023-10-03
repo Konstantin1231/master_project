@@ -50,7 +50,7 @@ def custom_reward(state, reward, terminated, game = "Frozen"):
             elif terminated and reward == 1:
                 reward = 10
             else:
-                reward = -1
+                reward = 0
     else:
         pass
     return reward
