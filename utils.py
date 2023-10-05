@@ -14,7 +14,6 @@ def run_episodes_mtr(policy, env, n_episodes=1, horizon=100, obs_dim=1, game="Fr
 
     # Determine the dimensionality of the observation space and define the input vector size
     ObsSpaceDim = obs_dim
-    nInput = ObsSpaceDim + 1
 
     # Run episodes until the specified number of episodes is reached
     while (run < n_episodes):
@@ -27,8 +26,8 @@ def run_episodes_mtr(policy, env, n_episodes=1, horizon=100, obs_dim=1, game="Fr
         # Run each episode until it is terminated or the horizon is reached
         while (not terminated and i < horizon):
             # Initialize the input vector and set its elements
-            input_vector = np.zeros(nInput)
-            input_vector[:ObsSpaceDim] = state
+            input_vector = np.zeros(ObsSpaceDim + 1)
+            input_vector[:obs_dim] = state
             input_vector[-1] = (horizon - i) / horizon
 
             # Convert the input vector to a PyTorch tensor and compute action probabilities using the policy
@@ -40,7 +39,7 @@ def run_episodes_mtr(policy, env, n_episodes=1, horizon=100, obs_dim=1, game="Fr
             action = torch.multinomial(probs, num_samples=1).item()
 
             # Execute the sampled action in the environment and observe the next state, reward, and termination signal
-            next_state, reward, terminated, truncated, info = run_env_step(env, action=action, random_action=False)
+            next_state, reward, terminated, truncated, info = run_env_step(env, action=action, random_action=False, obs_dim=obs_dim)
             reward = custom_reward(state, reward, terminated, game=game)
             # Append the experience tuple to the episode
             episode.append((input_vector, action, reward, probs[action].detach().numpy()))
@@ -67,6 +66,7 @@ def run_episodes(policy, env, n_episodes=1, limit=1000000, obs_dim=1, game="Froz
         terminated = False
         state, _ = initialize_env(env, obs_dim=obs_dim)
         i = 1
+        print(state)
         while (not terminated and i < limit):
             state_tensor = torch.tensor(state, dtype=torch.float)
             probs = policy(state_tensor)

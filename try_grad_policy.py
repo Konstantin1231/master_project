@@ -100,15 +100,16 @@ class PolicyNet(nn.Module):
 
 # Step 4: Calculate returns for each episode and update the policy.
 def train_policy(policy, optimizer, episodes, gamma=0.99, clip_grad= True ):
-    total_loss = 0
+    total_reward = 0
     for episode in episodes:
         returns = []  # List to store the returns for each step
         G = 0
+        r = 0 #for plotting reward
         # Calculate the returns by iterating through the episode in reverse
         for _, _, reward in reversed(episode):
+            total_reward+= reward
             G = reward + gamma * G
             returns.insert(0, G)
-
         # Convert episode data into tensors for PyTorch calculations
         states, actions, _= zip(*episode)
         states_tensor = torch.FloatTensor(states)
@@ -127,5 +128,5 @@ def train_policy(policy, optimizer, episodes, gamma=0.99, clip_grad= True ):
             torch.nn.utils.clip_grad_value_(policy.parameters(), clip_value=6)
         optimizer.step()
 
-        total_loss += loss.item()
-    return total_loss / len(episodes)
+
+    return total_reward / len(episodes)

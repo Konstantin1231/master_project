@@ -18,7 +18,7 @@ class CustomLoss(nn.Module):
         """
         :param C: we pass parameter C, to be sure that optimizer see it.
         """
-        return torch.log(outputs)*self.C
+        return -torch.sum(torch.log(outputs)*self.C)
 
 
 # Step 2: Define the policy model.
@@ -111,8 +111,8 @@ class PolicyNet(nn.Module):
 
 def train_policy_mtr(policy, optimizer, episodes, gamma=0.99, tau=1, clip_grad = True):
     # Initialize total_loss to store cumulative loss over all episodes
-    total_loss = 0
     # Iterate over each episode in episodes
+    total_reward = 0
     for episode in episodes:
         # Initialize lists to store rewards and action probabilities for the episode
         reward_list = []
@@ -121,17 +121,16 @@ def train_policy_mtr(policy, optimizer, episodes, gamma=0.99, tau=1, clip_grad =
         # Calculate the returns and action probabilities by iterating through the episode in reverse
         # Corresponds to sampling actions and collecting rewards in Algorithm 1
         for _, _, reward, a in reversed(episode):
+            total_reward+=reward
             reward_list.append(reward)
             prob_action_list.append(a)
-
         # Compute entropy rewards and the cumulative sum, C
         # Corresponds to the MPG update step and C_i computation in Algorithm 1
-        entropy_rewards = np.array([reward_list]) - tau * np.log(policy.output_size * np.array(prob_action_list))
+        entropy_rewards = np.array(reward_list) - tau * np.log(policy.output_size * np.array(prob_action_list))
         C = np.cumsum(entropy_rewards)
 
         # Convert C to a float tensor for PyTorch calculations
-        C = torch.FloatTensor(entropy_rewards)
-
+        C = torch.FloatTensor(C)
         # Extract episode data and convert them to tensors for PyTorch calculations
         input_vector, actions, _, _ = zip(*episode)
         input_vector_tensor = torch.FloatTensor((input_vector))
@@ -142,21 +141,27 @@ def train_policy_mtr(policy, optimizer, episodes, gamma=0.99, tau=1, clip_grad =
         probs = policy(input_vector_tensor)
         picked_log_probs = probs[range(len(actions)), actions_tensor]
         picked_log_probs = torch.flip(picked_log_probs, dims=[0])
+        # Compute the policy gradient loss
+        loss = CustomLoss(C)
+        optimizer.zero_grad()
+        loss(picked_log_probs).backward()
+        if clip_grad == True:
+            torch.nn.utils.clip_grad_value_(policy.parameters(), clip_value=10)
+        optimizer.step()
+        """
         for i in range(len(C)):
             loss = CustomLoss(C[i])
-            # Compute the policy gradient loss
-            loss(picked_log_probs[i])
             # Perform backpropagation and optimization step
             # Corresponds to the update of policy parameters in Algorithm 1
             optimizer.zero_grad()
-            loss.backward()
+            print(C[i])
+            loss(picked_log_probs[i]).backward()
             if clip_grad == True:
                 torch.nn.utils.clip_grad_value_(policy.parameters(), clip_value=10)
             optimizer.step()
             # Accumulate the loss
-            total_loss += loss.item()
-
+        """
 
     # Return the average loss across all episodes
-    return total_loss / len(episodes)
+    return total_reward/len(episodes)
 
