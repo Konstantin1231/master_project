@@ -146,7 +146,7 @@ def train_policy_mtr(policy, optimizer, episodes, gamma=0.99, tau=1, clip_grad =
         optimizer.zero_grad()
         loss(picked_log_probs).backward()
         if clip_grad == True:
-            torch.nn.utils.clip_grad_value_(policy.parameters(), clip_value=10)
+           torch.nn.utils.clip_grad_value_(policy.parameters(), clip_value=10)
         optimizer.step()
         """
         for i in range(len(C)):
