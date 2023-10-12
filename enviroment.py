@@ -1,25 +1,3 @@
-
-# Step 1: Set up the environment.
-
-"""
-Classical way to interact with the environment:
-import gymnasium as gym
-env = gym.make("LunarLander-v2", render_mode="human")
-observation, info = env.reset()
-
-for _ in range(1000):
-    action = env.action_space.sample()  # agent policy that uses the observation and info (we just sample a random action )
-    observation, reward, terminated, truncated, info = env.step(action)
-
-    if terminated or truncated:
-        observation, info = env.reset()
-
-env.close()
-"""
-
-
-
-
 def initialize_env(env, obs_dim = 1):
     observation, info = env.reset()
     if obs_dim == 1:

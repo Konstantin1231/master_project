@@ -2,52 +2,37 @@
         RUN EPISODES (NON TD)
 """
 from enviroment import *
-import torch
 import numpy as np
-
-
+import torch
 # Collect episodes using the current policy.
-def run_episodes_mtr(policy, env, n_episodes=1, horizon=100, obs_dim=1, game="Frozen"):
+def run_episodes_mtr(agent, env, n_episodes=1, game="Frozen"):
     # Initialize the run counter and an empty list to store episodes
     run = 0
     episodes = []
-
-    # Determine the dimensionality of the observation space and define the input vector size
-    ObsSpaceDim = obs_dim
-
+    obs_dim = agent.ObsSpaceDim
+    horizon = agent.horizon
     # Run episodes until the specified number of episodes is reached
     while (run < n_episodes):
         # Initialize variables for each episode
         episode = []
         state, _ = initialize_env(env, obs_dim=obs_dim)
-        i = 0
-        truncated = False
+        step = 0
         terminated = False
         # Run each episode until it is terminated or the horizon is reached
-        while (not terminated and i < horizon):
+        while (not terminated and step < horizon):
+            input_vector = np.zeros(agent.ObsSpaceDim + 1)
+            input_vector[:agent.ObsSpaceDim] = state
+            input_vector[-1] = (agent.horizon - step) / agent.horizon
             # Initialize the input vector and set its elements
-            input_vector = np.zeros(ObsSpaceDim + 1)
-            input_vector[:obs_dim] = state
-            input_vector[-1] = (horizon - i) / horizon
-
-            # Convert the input vector to a PyTorch tensor and compute action probabilities using the policy
-            input_vector_tensor = torch.tensor(input_vector, dtype=torch.float)
-            with torch.no_grad():
-                probs = policy(input_vector_tensor)
-
-            # Sample an action according to the computed probabilities
-            action = torch.multinomial(probs, num_samples=1).item()
-
+            action, probs = agent.select_action(input_vector)
             # Execute the sampled action in the environment and observe the next state, reward, and termination signal
             next_state, reward, terminated, truncated, info = run_env_step(env, action=action, random_action=False, obs_dim=obs_dim)
             reward = custom_reward(state, reward, terminated, game=game)
             # Append the experience tuple to the episode
-            episode.append((input_vector, action, reward, probs[action].detach().numpy()))
-
+            episode.append((input_vector, step, action, reward, probs[action].detach().numpy()))
             # Update the current state and time step
             state = next_state
-            i += 1
-
+            step += 1
         # Append the completed episode to the list of episodes
         episodes.append(episode)
         run += 1
@@ -57,32 +42,24 @@ def run_episodes_mtr(policy, env, n_episodes=1, horizon=100, obs_dim=1, game="Fr
 
 
 # Collect episodes using the current policy.
-def run_episodes(policy, env, n_episodes=1, limit=1000000, obs_dim=1, game="Frozen", epsilon_greedy=0):
+def run_episodes(agent, env, n_episodes=1, game="Frozen"):
     run = 0
     episodes = []
+    obs_dim = agent.ObsSpaceDim
     while (run < n_episodes):
         episode = []
         truncated = False
         terminated = False
         state, _ = initialize_env(env, obs_dim=obs_dim)
-        i = 1
-        print(state)
-        while (not terminated and i < limit):
-            state_tensor = torch.tensor(state, dtype=torch.float)
-            probs = policy(state_tensor)
-            action = torch.multinomial(probs, num_samples=1).item()
-            if np.random.uniform() < epsilon_greedy:
-                next_state, reward, terminated, truncated, info = run_env_step(env, action=action, random_action=True,
-                                                                               obs_dim=obs_dim)
-            else:
-                next_state, reward, terminated, truncated, info = run_env_step(env, action=action, random_action=False,
-                                                                               obs_dim=obs_dim)
+        step = 1
+        while (not terminated and step < agent.horizon):
+            action, probs = agent.select_action(state)
+            next_state, reward, terminated, truncated, info = run_env_step(env, action=action, random_action=False,obs_dim=obs_dim)
             reward_new = custom_reward(state, reward, terminated, game=game)
-            if terminated:
-                pass
-            episode.append((state, action, reward_new))
+            episode.append((state, step, action, reward_new, probs[action].detach().numpy() ))
             state = next_state
+            step += 1
         episodes.append(episode)
-        i += 1
+
         run += 1
     return episodes
