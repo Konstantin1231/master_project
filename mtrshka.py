@@ -112,18 +112,24 @@ class PolicyNet(nn.Module):
 
 
 class ReinforceAgent:
-    def __init__(self, n_inputs, n_outputs, hidden_dim, horizon = 100000, beta = 0.5, learning_rate=1e-3):
+    def __init__(self, n_inputs, n_outputs, hidden_dim, game_name, horizon = 100000, beta = 0.5, learning_rate=1e-3):
         self.policy = PolicyNet(n_inputs, n_outputs, hidden_dim)
         self.optimizer = optim.Adam(self.policy.parameters(), lr=learning_rate)
         self.ObsSpaceDim = n_inputs
+        self.n_action = n_outputs
         self.beta = beta
         self.horizon = horizon
+        self.game_name = game_name
     def select_action(self, state):
         state_tensor = torch.tensor(state, dtype=torch.float)
-        softmax_output = self.policy(state_tensor)
-        action_probs = softmax_output
+        action_probs = self.policy(state_tensor)
         action = torch.multinomial(action_probs, 1).item()
-        return action, action_probs
+        if self.game_name == "Pendulum":
+            possible_actions = np.linspace(-2,2,self.n_action)
+            action_value = possible_actions[action]
+            return action, action_probs, [action_value]
+        else:
+            return action, action_probs, action
 
     def train(self, episodes, gamma=0.99, clip_grad=False):
         total_reward = 0
@@ -131,12 +137,12 @@ class ReinforceAgent:
             returns = []  # List to store the returns for each step
             G = 0
             # Calculate the returns by iterating through the episode in reverse
-            for _, _, reward in reversed(episode):
+            for _, _,_, reward, _ in reversed(episode):
                 total_reward += reward
                 G = reward + gamma * G
                 returns.insert(0, G)
             # Convert episode data into tensors for PyTorch calculations
-            states, actions, _ = zip(*episode)
+            states, _, actions, _,_ = zip(*episode)
             states_tensor = torch.FloatTensor(states)
             actions_tensor = torch.LongTensor(actions)
             returns_tensor = torch.FloatTensor(returns)
@@ -157,21 +163,28 @@ class ReinforceAgent:
 
 
 class MTRAgent:
-    def __init__(self, n_inputs, n_outputs, hidden_dim, horizon, tau=1,beta = 0.5, learning_rate=1e-3):
+    def __init__(self, n_inputs, n_outputs, hidden_dim, horizon,game_name, tau=1,beta = 0.5, learning_rate=1e-3):
         self.policy = PolicyNet(n_inputs+1, n_outputs, hidden_dim)
         self.optimizer = optim.Adam(self.policy.parameters(), lr=learning_rate)
         self.ObsSpaceDim = n_inputs
+        self.n_action = n_outputs
         self.horizon =  horizon
         self.tau = tau
         self.beta = beta
+        self.game_name = game_name
     def select_action(self, input_vector):
         input_vector_tensor = torch.tensor(input_vector, dtype=torch.float)
         with torch.no_grad():
-            probs = self.policy(input_vector_tensor)
+            probs = self.policy(input_vector_tensor, tau = self.tau)
         action = torch.multinomial(probs, num_samples=1).item()
-        return action, probs
+        if self.game_name == "Pendulum":
+            possible_actions = np.linspace(-2,2,self.n_action)
+            action_value = possible_actions[action]
+            return action, probs, [action_value]
+        else:
+            return action, probs, action
 
-    def train(self, episodes, gamma=0.99, tau=1, clip_grad=False):
+    def train(self, episodes, gamma=0.99,  clip_grad=False):
         # Initialize total_loss to store cumulative loss over all episodes
         # Iterate over each episode in episodes
         total_reward = 0
@@ -188,7 +201,7 @@ class MTRAgent:
                 prob_action_list.append(a)
             # Compute entropy rewards and the cumulative sum, C
             # Corresponds to the MPG update step and C_i computation in Algorithm 1
-            entropy_rewards = np.array(reward_list) - tau * np.log(self.policy.output_size * np.array(prob_action_list))
+            entropy_rewards = np.array(reward_list) - self.tau * np.log(self.policy.output_size * np.array(prob_action_list))
             C = np.cumsum(entropy_rewards)
 
             # Convert C to a float tensor for PyTorch calculations

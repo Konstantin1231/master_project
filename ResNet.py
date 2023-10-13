@@ -1,4 +1,4 @@
-import gym
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -31,20 +31,27 @@ class ResNet(nn.Module):
         return softmax_outputs
 
 class ReinforceResnetAgent:
-    def __init__(self, n_inputs,  n_outputs, horizon,  hidden_dim, beta = 0.5, learning_rate=1e-3):
+    def __init__(self, n_inputs,  n_outputs, horizon,  hidden_dim, game_name, beta = 0.5, learning_rate=1e-3):
         self.horizon = horizon
         self.policy = ResNet(n_inputs, self.horizon, hidden_dim)
         self.optimizer = optim.Adam(self.policy.parameters(), lr=learning_rate)
         self.ObsSpaceDim = n_inputs
+        self.n_action = n_outputs
         self.beta = beta
         self.horizon = horizon
+        self.game_name = game_name
 
     def select_action(self, state_tensor, step):
         softmax_outputs = self.policy(state_tensor)
         block_idx = self.horizon - step  # step starts from 1
         action_probs = softmax_outputs[block_idx]  # Using the softmax output of specific block
         action = torch.multinomial(action_probs, 1).item()
-        return action, action_probs
+        if self.game_name == "Pendulum":
+            possible_actions = np.linspace(-2, 2, self.n_action)
+            action_value = possible_actions[action]
+            return action, action_probs, [action_value]
+        else:
+            return action, action_probs, action
 
     def train(self, states, actions, rewards, episodes, gamma=0.99):
         total_reward = 0
