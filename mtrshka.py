@@ -120,6 +120,7 @@ class ReinforceAgent:
         self.beta = beta
         self.horizon = horizon
         self.game_name = game_name
+        self.name = "REIN"
     def select_action(self, state):
         state_tensor = torch.tensor(state, dtype=torch.float)
         action_probs = self.policy(state_tensor)
@@ -172,6 +173,7 @@ class MTRAgent:
         self.tau = tau
         self.beta = beta
         self.game_name = game_name
+        self.name = "MTR"
     def select_action(self, input_vector):
         input_vector_tensor = torch.tensor(input_vector, dtype=torch.float)
         with torch.no_grad():
@@ -195,13 +197,16 @@ class MTRAgent:
 
             # Calculate the returns and action probabilities by iterating through the episode in reverse
             # Corresponds to sampling actions and collecting rewards in Algorithm 1
-            for _, _, _, reward, a in reversed(episode):
+            for input_vector, _, _, reward, a in reversed(episode):
                 total_reward += reward
                 reward_list.append(reward)
                 prob_action_list.append(a)
             # Compute entropy rewards and the cumulative sum, C
             # Corresponds to the MPG update step and C_i computation in Algorithm 1
             entropy_rewards = np.array(reward_list) - self.tau * np.log(self.policy.output_size * np.array(prob_action_list))
+            # Centre rewards by subtraction of the value function
+            last_state, _, _, _, _ = episode[-1]
+            entropy_rewards [-1] = entropy_rewards [-1] - self.policy.value(torch.FloatTensor(last_state), self.tau).detach().numpy()
             C = np.cumsum(entropy_rewards)
 
             # Convert C to a float tensor for PyTorch calculations

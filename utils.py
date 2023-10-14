@@ -6,7 +6,7 @@ import random
 from enviroment import *
 import numpy as np
 # Collect episodes using the current policy.
-def run_episodes_mtr(agent, env, n_episodes=1, game="Lake"):
+def run_episodes_mtr(agent, env, n_episodes=1, game="Lake", render = False):
     # Initialize the run counter and an empty list to store episodes
     run = 0
     episodes = []
@@ -17,6 +17,8 @@ def run_episodes_mtr(agent, env, n_episodes=1, game="Lake"):
         # Initialize variables for each episode
         episode = []
         state, _ = initialize_env(env, obs_dim=obs_dim)
+        if render:
+            env.render()
         step = 0
         terminated = False
         # Run each episode until it is terminated or the horizon is reached
@@ -33,6 +35,8 @@ def run_episodes_mtr(agent, env, n_episodes=1, game="Lake"):
             # Append the experience tuple to the episode
             episode.append((input_vector, step, action, reward_new, probs[action].detach().numpy()))
             # Update the current state and time step
+            if render:
+                env.render()
             state = next_state
             step += 1
         # Append the completed episode to the list of episodes
@@ -44,7 +48,7 @@ def run_episodes_mtr(agent, env, n_episodes=1, game="Lake"):
 
 
 # Collect episodes using the current policy.
-def run_episodes(agent, env, n_episodes=1, game="Lake", epsilon = 0):
+def run_episodes(agent, env, n_episodes=1, game="Lake", epsilon = 0, render = False):
     run = 0
     episodes = []
     obs_dim = agent.ObsSpaceDim
@@ -53,7 +57,9 @@ def run_episodes(agent, env, n_episodes=1, game="Lake", epsilon = 0):
         truncated = False
         terminated = False
         state, _ = initialize_env(env, obs_dim=obs_dim)
-        step = 1
+        if render:
+            env.render()
+        step = 0
         while (not terminated and step < agent.horizon):
             action, probs, action_value = agent.select_action(state)
             if random.uniform(0,1) < epsilon:
@@ -63,9 +69,15 @@ def run_episodes(agent, env, n_episodes=1, game="Lake", epsilon = 0):
                 next_state, reward, terminated, truncated, info, _ = run_env_step(env, action=action_value, random_action=False,obs_dim=obs_dim)
             reward_new = custom_reward(state, reward, terminated, game_name=game)
             episode.append((state, step, action, reward_new, probs[action].detach().numpy() ))
+            if render:
+                env.render()
             state = next_state
             step += 1
         episodes.append(episode)
 
         run += 1
     return episodes
+
+def compute_decay(tau_end, tau_init, ngames, patience):
+    decay = tau_end**(patience/ngames)/tau_init**(patience/ngames)
+    return decay

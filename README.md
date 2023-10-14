@@ -66,15 +66,19 @@ The Maze game involves navigating through a complex maze to reach the goal. It's
 
 ![](images/Maze.jpg)
 
+### Toy Environment
+The Toy Environment is a simple game described in our work ( https://arxiv.org/pdf/2303.12785.pdf , page 26) and serves as a numerical support for theoretical findings. It provides valuable insights into the behavior of our Matryoshka algorithm in a controlled environment.
+
+![](images/Toy_1.jpg)
+
+
 ## To-Do List
 
 Here are the upcoming features and improvements planned for the Matryoshka Algo project:
 
 1. **Working NTK for Fully Connected NN:** We aim to develop a functional Neural Tangent Kernel (NTK) implementation for the fully connected neural network used in our first Matryoshka algorithm implementation. 
 
-2. **New Toy Environment:** We plan to create a new custom toy environment that aligns with the theoretical findings of the Matryoshka algorithm. This environment will serve as a dedicated testbed for further experimentation and validation.
-
-3. **New Custom ResNet:** As mentioned in the introduction.
+2. **New Custom ResNet:** As mentioned in the introduction.
 
 
 
