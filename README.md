@@ -91,9 +91,11 @@ The environment has three variables:
 - one_hot_coded; Boolean. When set to the True, use one hot coded representation of integers. By default, we use integer representation of stats state = 0,1, ...len(alphas)-1
 
 The environment setup could be done in the utils.py (game_setup() function):
+
 ![](images/picture1.png)
 
 In addition, the Toy.render() method, will prepare a plot, that shows the current agent's position, and highlights the next optimal action.
+
 ![](images/picture2.png)
 
 
