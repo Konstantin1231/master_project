@@ -81,7 +81,17 @@ Here are the upcoming features and improvements planned for the Matryoshka Algo 
 2. **New Custom ResNet:** As mentioned in the introduction.
 
 
+## New*
 
+In recent update, we have added new game environment "Toy".
+The object class can be found in the toy.py.
+The environment has three variables:
+- alphas; List of real numbers, used to construct rewards (Q_1): rewards = dot(alphas, basis ). In addition, the state dimension = len(alphas)
+- random_basis; Boolean. When set to the True, will generate random orthonormal basis. By default, we use canonical basis e_1, ...
+- one_hot_coded; Boolean. When set to the True, use one hot coded representation of integers. By default, we use integer representation of stats state = 0,1, ...len(alphas)-1
+
+The environment setup could be done in the utils.py (game_setup() function):
+![](images/picture1.png)
 
 
 
