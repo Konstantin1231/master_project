@@ -93,6 +93,9 @@ The environment has three variables:
 The environment setup could be done in the utils.py (game_setup() function):
 ![](images/picture1.png)
 
+In addition, the Toy.render() method, will prepare a plot, that shows the current agent's position, and highlights the next optimal action.
+![](images/picture2.png)
+
 
 
 
