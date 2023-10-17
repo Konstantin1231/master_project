@@ -127,7 +127,7 @@ We propose to try two versions (Can be found in MtrNet file):
 
 ![](images/Toy_3.jpg)
 
-![](images/Toy.png)
+![](images/toy.png)
 
 ## New* Original Matryoshka Algorithm 
 
