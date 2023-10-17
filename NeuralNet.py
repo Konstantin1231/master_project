@@ -1,25 +1,27 @@
-import gym
-import numpy as np
 import torch
 import torch.nn as nn
 import copy
 import pickle
 import torch.optim as optim
 from enviroment import *
+
 # Step 1: Set up the environment.
 env = gym.make('CartPole-v1')
+
 
 # Adding Cunstom loss, to ensure that optimizer works correctly
 class CustomLoss(nn.Module):
     """ to simplify the gradient computation and applying log to the output of the  network"""
+
     def __init__(self, C):
         super().__init__()
         self.C = C
+
     def forward(self, outputs: torch.Tensor):
         """
         :param C: we pass parameter C, to be sure that optimizer see it.
         """
-        return -torch.sum(torch.log(outputs)*self.C)
+        return -torch.sum(torch.log(outputs) * self.C)
 
 
 # Step 2: Define the policy model.
@@ -35,10 +37,11 @@ class PolicyNet(nn.Module):
         )
         self.output_size = n_outputs
         self.softmax = nn.Softmax(dim=-1)
+
     def forward(self, x, tau=1):
-        x = self.fc(x) # dividing by tau before
+        x = self.fc(x)  # dividing by tau before
         # we apply softmax
-        return self.softmax(x/tau)
+        return self.softmax(x / tau)
 
     # Initialize weights of NN according to the scheme presented on the  page 102 EPFL_TH9825.pdf
     def ntk_init(self, beta=0.5):
@@ -82,7 +85,7 @@ class PolicyNet(nn.Module):
     """ CODE COPIED FROM Hanveiga """
 
     def value(self, x, tau):
-        return tau * torch.log((torch.exp(self.fc(x) / tau).sum() / (self.output_size)))
+        return tau * torch.log((torch.exp(self.fc(x) / tau).sum() / self.output_size))
 
     def norm_param(self):
         # prints norm of parameters per layer
@@ -110,9 +113,8 @@ class PolicyNet(nn.Module):
             self.state_dict()[layer] = weights_state_dict[layer]
 
 
-
 class ReinforceAgent:
-    def __init__(self, n_inputs, n_outputs, hidden_dim, game_name, horizon = 100000, beta = 0.5, learning_rate=1e-3):
+    def __init__(self, n_inputs, n_outputs, hidden_dim, game_name, horizon=100000, beta=0.5, learning_rate=1e-3):
         self.policy = PolicyNet(n_inputs, n_outputs, hidden_dim)
         self.optimizer = optim.Adam(self.policy.parameters(), lr=learning_rate)
         self.ObsSpaceDim = n_inputs
@@ -121,12 +123,13 @@ class ReinforceAgent:
         self.horizon = horizon
         self.game_name = game_name
         self.name = "REIN"
+
     def select_action(self, state):
         state_tensor = torch.tensor(state, dtype=torch.float)
         action_probs = self.policy(state_tensor)
         action = torch.multinomial(action_probs, 1).item()
         if self.game_name == "Pendulum":
-            possible_actions = np.linspace(-2,2,self.n_action)
+            possible_actions = np.linspace(-2, 2, self.n_action)
             action_value = possible_actions[action]
             return action, action_probs, [action_value]
         else:
@@ -138,12 +141,12 @@ class ReinforceAgent:
             returns = []  # List to store the returns for each step
             G = 0
             # Calculate the returns by iterating through the episode in reverse
-            for _, _,_, reward, _ in reversed(episode):
+            for _, _, _, reward, _ in reversed(episode):
                 total_reward += reward
                 G = reward + gamma * G
                 returns.insert(0, G)
             # Convert episode data into tensors for PyTorch calculations
-            states, _, actions, _,_ = zip(*episode)
+            states, _, actions, _, _ = zip(*episode)
             states_tensor = torch.FloatTensor(states)
             actions_tensor = torch.LongTensor(actions)
             returns_tensor = torch.FloatTensor(returns)
@@ -164,29 +167,30 @@ class ReinforceAgent:
 
 
 class MTRAgent:
-    def __init__(self, n_inputs, n_outputs, hidden_dim, horizon,game_name, tau=1,beta = 0.5, learning_rate=1e-3):
-        self.policy = PolicyNet(n_inputs+1, n_outputs, hidden_dim)
+    def __init__(self, n_inputs, n_outputs, hidden_dim, horizon, game_name, tau=1, beta=0.5, learning_rate=1e-3):
+        self.policy = PolicyNet(n_inputs + 1, n_outputs, hidden_dim)
         self.optimizer = optim.Adam(self.policy.parameters(), lr=learning_rate)
         self.ObsSpaceDim = n_inputs
         self.n_action = n_outputs
-        self.horizon =  horizon
+        self.horizon = horizon
         self.tau = tau
         self.beta = beta
         self.game_name = game_name
         self.name = "MTR"
+
     def select_action(self, input_vector):
         input_vector_tensor = torch.tensor(input_vector, dtype=torch.float)
         with torch.no_grad():
-            probs = self.policy(input_vector_tensor, tau = self.tau)
+            probs = self.policy(input_vector_tensor, tau=self.tau)
         action = torch.multinomial(probs, num_samples=1).item()
         if self.game_name == "Pendulum":
-            possible_actions = np.linspace(-2,2,self.n_action)
+            possible_actions = np.linspace(-2, 2, self.n_action)
             action_value = possible_actions[action]
             return action, probs, [action_value]
         else:
             return action, probs, action
 
-    def train(self, episodes, gamma=0.99,  clip_grad=False):
+    def train(self, episodes, gamma=0.99, clip_grad=False):
         # Initialize total_loss to store cumulative loss over all episodes
         # Iterate over each episode in episodes
         total_reward = 0
@@ -197,16 +201,17 @@ class MTRAgent:
 
             # Calculate the returns and action probabilities by iterating through the episode in reverse
             # Corresponds to sampling actions and collecting rewards in Algorithm 1
-            for input_vector, _, _, reward, a in reversed(episode):
+            for _, _, _, reward, a in reversed(episode):
                 total_reward += reward
                 reward_list.append(reward)
                 prob_action_list.append(a)
             # Compute entropy rewards and the cumulative sum, C
             # Corresponds to the MPG update step and C_i computation in Algorithm 1
-            entropy_rewards = np.array(reward_list) - self.tau * np.log(self.policy.output_size * np.array(prob_action_list))
+            entropy_rewards = np.array(reward_list) - self.tau * np.log(
+                self.policy.output_size * np.array(prob_action_list))
             # Centre rewards by subtraction of the value function
-            last_state, _, _, _, _ = episode[-1]
-            entropy_rewards [-1] = entropy_rewards [-1] - self.policy.value(torch.FloatTensor(last_state), self.tau).detach().numpy()
+            #last_state, _, _, _, _ = episode[-1]
+            #entropy_rewards[-1] = entropy_rewards[-1] - self.policy.value(torch.FloatTensor(last_state), self.tau).detach().numpy()
             C = np.cumsum(entropy_rewards)
 
             # Convert C to a float tensor for PyTorch calculations
@@ -218,7 +223,7 @@ class MTRAgent:
 
             # Compute the log probabilities of the actions using the policy
             # Select the  probabilities corresponding to the taken actions
-            probs = self.policy(input_vector_tensor)
+            probs = self.policy(input_vector_tensor, tau=self.tau)
             picked_log_probs = probs[range(len(actions)), actions_tensor]
             picked_log_probs = torch.flip(picked_log_probs, dims=[0])
             # Compute the policy gradient loss
@@ -244,7 +249,3 @@ class MTRAgent:
 
         # Return the average loss across all episodes
         return total_reward / len(episodes)
-
-
-
-

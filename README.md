@@ -44,8 +44,28 @@ To set up this repository on your local machine, follow these steps:
    ```sh
    venv\Scripts\activate
    pip install -r requirements.txt
+   
+## Features
+
+### Change game environment 
+One might select of the proposed games:
+![](images/environment.png)
+
+In order to make more changes, one should explor enviroment.py file -> game_setup() function.
+Where, one can redefine any proposed constants or add new environment. 
+
+![](images/game_setup.png)
+
+### Change game rewards
+One can redefine default rewards using envoroment.py -> custom_reward() function.
+![](images/custom_reward.png)
 
 ## Results
+
+- MTR  - Feed Forward with extra dimension (for step horizon) and Max-entropy reward
+- REIN - Feed Forward. Reinforce algorithm 
+- MTRNet - Matryoshka Net with Max-entropy reward
+- ReinMTRNet - Matryoshka Net
 
 ### Cart-Pole Game
 The Cart-Pole game is a classic reinforcement learning environment where the goal is to balance a pole on a moving cart. The agent must make decisions to keep the pole balanced for as long as possible. The result shows the performance of our Matryoshka algorithm on the Cart-Pole task.
@@ -81,7 +101,7 @@ Here are the upcoming features and improvements planned for the Matryoshka Algo 
 2. **New Custom ResNet:** As mentioned in the introduction.
 
 
-## New*
+## New* TOY environment 
 
 In recent update, we have added new game environment "Toy".
 The object class can be found in the toy.py.
@@ -98,10 +118,20 @@ In addition, the Toy.render() method, will prepare a plot, that shows the curren
 
 ![](images/picture2.png)
 
+## New* Matryoshka NET (MTRNet)
 
+New custom ResNet. As we have already mentioned, this implementation offers a different perspective on the algorithm's implementation. Which is closer, to the idea of the original algorithm.
+We propose to try two versions (Can be found in MtrNet file):
+1. ReinforceMtrNetAgent - Agent that use non-stochastic reward and MTRNet as approximation function.
+2. MtrNetAgent - Realize Max-entropy reward, together with MTRNet approximation. (main algorithm)
 
+![](images/toy_3.jpg)
 
+![](images/toy.png)
 
+## New* Original Matryoshka Algorithm 
 
+The algorithm can be found in original.py file. Whereas, OriginalMtrAgent uses independant approximation function for each pi_i policy. 
 
+![](images/toy_4.jpg)
 

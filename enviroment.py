@@ -38,7 +38,13 @@ def custom_reward(state, reward, terminated, game_name="Lake"):
             reward = 100
         else:
             reward = -20
-    else:
+    elif game_name == "Maze":
+        pass
+    elif game_name == "Car":
+        pass
+    elif game_name == "Pendulum":
+        pass
+    elif game_name == "Toy":
         pass
     return reward
 
@@ -74,7 +80,7 @@ def game_setup(game_name, render=False):
         action_dim = env.action_space.n
     elif game_name == "Pendulum":
         gravity = 6
-        nOutput = 12
+        nOutput = 12 # will produce discrete space of action containing nOutput action samy spaced in the interval [-2,2]
         if render == True:
             env = gym.make('Pendulum-v1', g=gravity, render_mode="human")
         else:
@@ -83,8 +89,8 @@ def game_setup(game_name, render=False):
         obs_dim = len(obs)
         action_dim = nOutput
     elif game_name == "Toy":
-        alphas = [0.5, 1, -1, 2, 0.2, -0.7, 1, -0.2]
-        random_basis = False
+        alphas = [0.5, 1, -1, 2, 0.2, -0.7, 1, -0.2, 7]
+        random_basis = True
         one_hot_coded = True
         env = Toy_env(alphas, random_basis=random_basis, one_hot_coded=one_hot_coded)
         if one_hot_coded:
@@ -103,14 +109,14 @@ def render(agent, env,n_episodes=2):
     if game_name in ["Toy", "Maze"]:
         if agent.name == "REIN":
             run_episodes(agent, env, n_episodes=n_episodes, game=game_name, render=True)
-        elif agent.name == "MTR":
+        elif agent.name in ["MTR", "MtrNet","OriginalMtr" ]:
             agent.tau = 0.001
             run_episodes_mtr(agent, env, n_episodes=n_episodes, game=game_name, render=True)
     else:
         env, _, _ = game_setup(game_name, render=True)
         if agent.name == "REIN":
             run_episodes(agent, env, n_episodes=n_episodes, game=game_name)
-        elif agent.name == "MTR":
+        elif agent.name in ["MTR", "MtrNet","OriginalMtr" ]:
             agent.tau = 0.001
             run_episodes_mtr(agent, env, n_episodes=n_episodes, game=game_name)
 
