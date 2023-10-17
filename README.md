@@ -48,7 +48,7 @@ To set up this repository on your local machine, follow these steps:
 ## Features
 
 ### Change game environment 
-One might select of the proposed games:
+One might select one of the proposed games:
 ![](images/environment.png)
 
 In order to make more changes, one should explor enviroment.py file -> game_setup() function.
