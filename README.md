@@ -98,7 +98,7 @@ Here are the upcoming features and improvements planned for the Matryoshka Algo 
 
 1. **Working NTK for Fully Connected NN:** We aim to develop a functional Neural Tangent Kernel (NTK) implementation for the fully connected neural network used in our first Matryoshka algorithm implementation. 
 
-2. **New Custom ResNet:** As mentioned in the introduction.
+2. **Dynamical tau and learning rate.
 
 
 ## New* TOY environment 
