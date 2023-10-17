@@ -125,13 +125,13 @@ We propose to try two versions (Can be found in MtrNet file):
 1. ReinforceMtrNetAgent - Agent that use non-stochastic reward and MTRNet as approximation function.
 2. MtrNetAgent - Realize Max-entropy reward, together with MTRNet approximation. (main algorithm)
 
-![](images/toy_3.jpg)
+![](images/Toy_3.jpg)
 
-![](images/toy.png)
+![](images/Toy.png)
 
 ## New* Original Matryoshka Algorithm 
 
 The algorithm can be found in original.py file. Whereas, OriginalMtrAgent uses independant approximation function for each pi_i policy. 
 
-![](images/toy_4.jpg)
+![](images/Toy_4.jpg)
 
