@@ -2,6 +2,8 @@ import torch
 import torch.nn as nn
 import numpy as np
 import torch.optim as optim
+from ntk import empirical_ntk_ntk_vps, empirical_ntk_jacobian_contraction
+from torch.func import functional_call
 
 
 class CustomLoss(nn.Module):
@@ -70,6 +72,20 @@ class MtrNet(nn.Module):
     def value(self, x, tau):
         return tau * torch.log((torch.exp(self.forward(x, tau)[0] / tau).sum() / self.output_size))
 
+    def ntk(self, x1, x2, block_idx, tau=1, mode="full"):
+        """
+        Neural Tangent Kernel
+        :param mode: either "trace" or "full"
+        :param x1, x2: Should have batch dimension
+        """
+        params = {k: v.detach() for k, v in self.named_parameters()}
+
+        def fnet_single(params, x):
+            return functional_call(self, params, (x.unsqueeze(0), tau))[block_idx].squeeze(0)
+
+        result = empirical_ntk_jacobian_contraction(fnet_single, params, x1, x2, mode)
+        return result[:, 0]
+
 
 class ReinforceMtrNetAgent:
     def __init__(self, n_inputs, n_outputs, hidden_dim, horizon, game_name, tau=1, beta=0.5, learning_rate=1e-3):
@@ -93,9 +109,9 @@ class ReinforceMtrNetAgent:
         if self.game_name == "Pendulum":
             possible_actions = np.linspace(-2, 2, self.n_action)
             action_value = possible_actions[action]
-            return action, action_probs, [action_value]
+            return action, action_probs.to("cpu"), [action_value]
         else:
-            return action, action_probs, action
+            return action, action_probs.to("cpu"), action
 
     def train(self, episodes, gamma=0.99, clip_grad=False):
         total_reward = 0
@@ -142,6 +158,14 @@ class ReinforceMtrNetAgent:
             self.optimizer.step()
         return total_reward / len(episodes)
 
+    def ntk(self, x1, x2, step=0, mode="full", batch=False):
+        x1 = torch.tensor(x1, dtype=torch.float)
+        x2 = torch.tensor(x2, dtype=torch.float)
+        if not batch:
+            x1 = x1.unsqueeze(0)
+            x2 = x2.unsqueeze(0)
+        return self.policy.ntk(x1, x2, self.horizon - step, tau=self.tau, mode=mode)
+
 
 class MtrNetAgent:
     def __init__(self, n_inputs, n_outputs, hidden_dim, horizon, game_name, tau=1, beta=0.5, learning_rate=1e-3):
@@ -165,9 +189,9 @@ class MtrNetAgent:
         if self.game_name == "Pendulum":
             possible_actions = np.linspace(-2, 2, self.n_action)
             action_value = possible_actions[action]
-            return action, action_probs, [action_value]
+            return action, action_probs.to("cpu"), [action_value]
         else:
-            return action, action_probs, action
+            return action, action_probs.to("cpu"), action
 
     def train(self, episodes, gamma=0.99, clip_grad=False):
         total_reward = 0
@@ -182,8 +206,8 @@ class MtrNetAgent:
             entropy_rewards = np.array(reward_list) - self.tau * np.log(
                 self.policy.output_size * np.array(prob_action_list))
             # Centre rewards by subtraction of the value function
-            #last_state, _, _, _, _ = episode[-1]
-            #entropy_rewards[-1] = entropy_rewards[-1] - self.policy.value(torch.FloatTensor(last_state), self.tau).detach().numpy()
+            # last_state, _, _, _, _ = episode[-1]
+            # entropy_rewards[-1] = entropy_rewards[-1] - self.policy.value(torch.FloatTensor(last_state), self.tau).detach().numpy()
             C = np.cumsum(entropy_rewards)
             C = torch.FloatTensor(C)
             # Policy gradient update
@@ -210,8 +234,16 @@ class MtrNetAgent:
                 for param in self.policy.blocks[block_idx].parameters():
                     param.requires_grad_(False)
 
-                if clip_grad == True:
+                if clip_grad:
                     torch.nn.utils.clip_grad_value_(self.policy.parameters(), clip_value=10)
 
             self.optimizer.step()
         return total_reward / len(episodes)
+
+    def ntk(self, x1, x2, step=0, mode="full", batch=False):
+        x1 = torch.tensor(x1, dtype=torch.float)
+        x2 = torch.tensor(x2, dtype=torch.float)
+        if not batch:
+            x1 = x1.unsqueeze(0)
+            x2 = x2.unsqueeze(0)
+        return self.policy.ntk(x1, x2, self.horizon - step, tau=self.tau, mode=mode)

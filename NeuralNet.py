@@ -4,9 +4,8 @@ import copy
 import pickle
 import torch.optim as optim
 from enviroment import *
-
-# Step 1: Set up the environment.
-env = gym.make('CartPole-v1')
+from ntk import empirical_ntk_ntk_vps, empirical_ntk_jacobian_contraction
+from torch.func import functional_call
 
 
 # Adding Cunstom loss, to ensure that optimizer works correctly
@@ -42,6 +41,19 @@ class PolicyNet(nn.Module):
         x = self.fc(x)  # dividing by tau before
         # we apply softmax
         return self.softmax(x / tau)
+
+    def ntk(self, x1, x2, tau=1, mode="full"):
+        """
+        Neural Tangent Kernel
+        :param mode: either "trace" or "full"
+        :param x1, x2: Should have batch dimension
+        """
+        params = {k: v.detach() for k, v in self.named_parameters()}
+        def fnet_single(params, x):
+            return functional_call(self, params, (x.unsqueeze(0), tau)).squeeze(0)
+
+        result = empirical_ntk_jacobian_contraction(fnet_single, params, x1, x2, mode)
+        return result[:, 0]
 
     # Initialize weights of NN according to the scheme presented on the  page 102 EPFL_TH9825.pdf
     def ntk_init(self, beta=0.5):
@@ -159,11 +171,19 @@ class ReinforceAgent:
             # Perform backpropagation and optimization step
             self.optimizer.zero_grad()
             loss.backward()
-            if clip_grad == True:
+            if clip_grad:
                 torch.nn.utils.clip_grad_value_(self.policy.parameters(), clip_value=10)
             self.optimizer.step()
 
         return total_reward / len(episodes)
+
+    def ntk(self, x1, x2, mode="full", batch=False):
+        x1 = torch.tensor(x1, dtype=torch.float)
+        x2 = torch.tensor(x2, dtype=torch.float)
+        if not batch:
+            x1 = x1.unsqueeze(0)
+            x2 = x2.unsqueeze(0)
+        return self.policy.ntk(x1, x2, tau=1, mode=mode)
 
 
 class MTRAgent:
@@ -210,15 +230,15 @@ class MTRAgent:
             entropy_rewards = np.array(reward_list) - self.tau * np.log(
                 self.policy.output_size * np.array(prob_action_list))
             # Centre rewards by subtraction of the value function
-            #last_state, _, _, _, _ = episode[-1]
-            #entropy_rewards[-1] = entropy_rewards[-1] - self.policy.value(torch.FloatTensor(last_state), self.tau).detach().numpy()
+            # last_state, _, _, _, _ = episode[-1]
+            # entropy_rewards[-1] = entropy_rewards[-1] - self.policy.value(torch.FloatTensor(last_state), self.tau).detach().numpy()
             C = np.cumsum(entropy_rewards)
 
             # Convert C to a float tensor for PyTorch calculations
             C = torch.FloatTensor(C)
             # Extract episode data and convert them to tensors for PyTorch calculations
             input_vector, step, actions, _, _ = zip(*episode)
-            input_vector_tensor = torch.FloatTensor((input_vector))
+            input_vector_tensor = torch.FloatTensor(input_vector)
             actions_tensor = torch.LongTensor(actions)
 
             # Compute the log probabilities of the actions using the policy
@@ -230,7 +250,7 @@ class MTRAgent:
             loss = CustomLoss(C)
             self.optimizer.zero_grad()
             loss(picked_log_probs).backward()
-            if clip_grad == True:
+            if clip_grad:
                 torch.nn.utils.clip_grad_value_(self.policy.parameters(), clip_value=10)
             self.optimizer.step()
             """
@@ -249,3 +269,11 @@ class MTRAgent:
 
         # Return the average loss across all episodes
         return total_reward / len(episodes)
+
+    def ntk(self, x1, x2, mode="full", batch=False):
+        x1 = torch.tensor(x1, dtype=torch.float)
+        x2 = torch.tensor(x2, dtype=torch.float)
+        if not batch:
+            x1 = x1.unsqueeze(0)
+            x2 = x2.unsqueeze(0)
+        return self.policy.ntk(x1, x2, tau=self.tau, mode=mode)

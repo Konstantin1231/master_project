@@ -11,7 +11,10 @@ def initialize_env(env, obs_dim=1):
         return observation, info
 
 
-def run_env_step(env, action, random_action=False, obs_dim=1):
+def run_env_step(env, action=1, random_action=False, obs_dim=2):
+    """
+    To do: add random action to custom environments
+    """
     if random_action:
         action = env.action_space.sample()  # agent policy that uses the observation and info (we just sample a random action )
     observation, reward, terminated, truncated, info = env.step(action)

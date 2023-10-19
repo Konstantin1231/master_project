@@ -8,7 +8,7 @@ import numpy as np
 
 
 # Collect episodes using the current policy.
-def run_episodes_mtr(agent, env, n_episodes=1, game="Lake", render=False):
+def run_episodes_mtr(agent, env, n_episodes=1, render=False):
     # Initialize the run counter and an empty list to store episodes
     run = 0
     episodes = []
@@ -34,7 +34,7 @@ def run_episodes_mtr(agent, env, n_episodes=1, game="Lake", render=False):
             next_state, reward, terminated, truncated, info, _ = run_env_step(env, action=action_value,
                                                                               random_action=False, obs_dim=obs_dim)
             # Custom reward
-            reward_new = custom_reward(state, reward, terminated, game_name=game)
+            reward_new = custom_reward(state, reward, terminated, game_name=agent.game_name)
             # Append the experience tuple to the episode
             episode.append((input_vector, step, action, reward_new, probs[action].detach().numpy()))
             # Update the current state and time step
@@ -51,7 +51,7 @@ def run_episodes_mtr(agent, env, n_episodes=1, game="Lake", render=False):
 
 
 # Collect episodes using the current policy.
-def run_episodes(agent, env, n_episodes=1, game="Lake", epsilon=0, render=False):
+def run_episodes(agent, env, n_episodes=1, epsilon=0, render=False):
     run = 0
     episodes = []
     obs_dim = agent.ObsSpaceDim
@@ -75,7 +75,7 @@ def run_episodes(agent, env, n_episodes=1, game="Lake", epsilon=0, render=False)
             else:
                 next_state, reward, terminated, truncated, info, _ = run_env_step(env, action=action_value,
                                                                                   random_action=False, obs_dim=obs_dim)
-            reward_new = custom_reward(state, reward, terminated, game_name=game)
+            reward_new = custom_reward(state, reward, terminated, game_name=agent.game_name)
             episode.append((state, step, action, reward_new, probs[action].detach().numpy()))
             if render:
                 env.render()
