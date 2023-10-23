@@ -37,23 +37,39 @@ class PolicyNet(nn.Module):
         self.output_size = n_outputs
         self.softmax = nn.Softmax(dim=-1)
 
-    def forward(self, x, tau=1):
+    def forward(self, x, tau=1, softmax=True):
         x = self.fc(x)  # dividing by tau before
         # we apply softmax
-        return self.softmax(x / tau)
+        if softmax:
+            return self.softmax(x / tau)
+        else:
+            return x
 
-    def ntk(self, x1, x2, tau=1, mode="full"):
+    def ntk(self, x1, x2, tau, mode="full", softmax=False, show_dim_jac=False):
         """
         Neural Tangent Kernel
         :param mode: either "trace" or "full"
         :param x1, x2: Should have batch dimension
         """
         params = {k: v.detach() for k, v in self.named_parameters()}
-        def fnet_single(params, x):
-            return functional_call(self, params, (x.unsqueeze(0), tau)).squeeze(0)
 
-        result = empirical_ntk_jacobian_contraction(fnet_single, params, x1, x2, mode)
-        return result[:, 0]
+        def fnet_single(params, x):
+            return functional_call(self, params, (x.unsqueeze(0), tau, softmax)).squeeze(0)
+
+        result = empirical_ntk_jacobian_contraction(fnet_single, params, x1, x2, mode, show_dim_jac=show_dim_jac)
+        return result
+
+    def count_parameters_by_layers(self):
+        parameters = {}
+        for name, parameter in self.named_parameters():
+            parameters[name] = parameter.numel()  # numel returns the total number of elements in the tensor
+        return parameters
+
+    def total_number_parameters(self):
+        total_params = 0
+        for name, parameter in self.named_parameters():
+            total_params += parameter.numel()  # numel returns the total number of elements in the tensor
+        return total_params
 
     # Initialize weights of NN according to the scheme presented on the  page 102 EPFL_TH9825.pdf
     def ntk_init(self, beta=0.5):
@@ -125,20 +141,31 @@ class PolicyNet(nn.Module):
             self.state_dict()[layer] = weights_state_dict[layer]
 
 
+
 class ReinforceAgent:
-    def __init__(self, n_inputs, n_outputs, hidden_dim, game_name, horizon=100000, beta=0.5, learning_rate=1e-3):
+    def __init__(self, n_inputs, n_outputs, hidden_dim, game_name, horizon=100000, beta=0.5, learning_rate=1e-3, tau=1):
         self.policy = PolicyNet(n_inputs, n_outputs, hidden_dim)
         self.optimizer = optim.Adam(self.policy.parameters(), lr=learning_rate)
         self.ObsSpaceDim = n_inputs
         self.n_action = n_outputs
         self.beta = beta
+        self.tau = tau
         self.horizon = horizon
         self.game_name = game_name
+        self.lr = learning_rate
         self.name = "REIN"
+
+    def set_optimazer(self, lr=None):
+        if lr == None:
+            self.optimizer = optim.Adam(self.policy.parameters(), lr=self.lr)
+        else:
+            self.optimizer = optim.Adam(self.policy.parameters(), lr=lr)
+            self.lr = lr
 
     def select_action(self, state):
         state_tensor = torch.tensor(state, dtype=torch.float)
-        action_probs = self.policy(state_tensor)
+        with torch.no_grad():
+            action_probs = self.policy(state_tensor)
         action = torch.multinomial(action_probs, 1).item()
         if self.game_name == "Pendulum":
             possible_actions = np.linspace(-2, 2, self.n_action)
@@ -177,13 +204,23 @@ class ReinforceAgent:
 
         return total_reward / len(episodes)
 
-    def ntk(self, x1, x2, mode="full", batch=False):
+    def ntk(self, x1, x2, mode="full", batch=False, softmax=False, show_dim_jac=False):
+        """
+        NTK (NEURAL TANGENT KERNEL)
+        :param x1: first input tensor (can be in batch)
+        :param x2: second input tensor (can be in batch)
+        :param mode: two options: "full", "trace"
+        :param batch: True, if you have batch inputs
+        :param softmax: True, if you want to apply softmax on the preferences (Q) output.Default is False
+        :param show_dim_jac: True, if you wish to check Layers names and dimension used to calculate the Jacobian
+        :return: list, where list[0] is ntk tensor, and list[1] is Jacobian. ntk = jac(x1) @ jac^T(x2)
+        """
         x1 = torch.tensor(x1, dtype=torch.float)
         x2 = torch.tensor(x2, dtype=torch.float)
         if not batch:
             x1 = x1.unsqueeze(0)
             x2 = x2.unsqueeze(0)
-        return self.policy.ntk(x1, x2, tau=1, mode=mode)
+        return self.policy.ntk(x1, x2, tau=self.tau, mode=mode, softmax=softmax, show_dim_jac=show_dim_jac)
 
 
 class MTRAgent:
@@ -195,9 +232,16 @@ class MTRAgent:
         self.horizon = horizon
         self.tau = tau
         self.beta = beta
+        self.lr = learning_rate
         self.game_name = game_name
         self.name = "MTR"
 
+    def set_optimazer(self, lr=None):
+        if lr == None:
+            self.optimizer = optim.Adam(self.policy.parameters(), lr=self.lr)
+        else:
+            self.optimizer = optim.Adam(self.policy.parameters(), lr=lr)
+            self.lr = lr
     def select_action(self, input_vector):
         input_vector_tensor = torch.tensor(input_vector, dtype=torch.float)
         with torch.no_grad():
@@ -253,27 +297,24 @@ class MTRAgent:
             if clip_grad:
                 torch.nn.utils.clip_grad_value_(self.policy.parameters(), clip_value=10)
             self.optimizer.step()
-            """
-            for i in range(len(C)):
-                loss = CustomLoss(C[i])
-                # Perform backpropagation and optimization step
-                # Corresponds to the update of policy parameters in Algorithm 1
-                optimizer.zero_grad()
-                print(C[i])
-                loss(picked_log_probs[i]).backward()
-                if clip_grad == True:
-                    torch.nn.utils.clip_grad_value_(policy.parameters(), clip_value=10)
-                optimizer.step()
-                # Accumulate the loss
-            """
 
         # Return the average loss across all episodes
         return total_reward / len(episodes)
 
-    def ntk(self, x1, x2, mode="full", batch=False):
+    def ntk(self, x1, x2, mode="full", batch=False, softmax=False, show_dim_jac=False):
+        """
+        NTK (NEURAL TANGENT KERNEL)
+        :param x1: first input tensor (can be in batch)
+        :param x2: second input tensor (can be in batch)
+        :param mode: two options: "full", "trace"
+        :param batch: True, if you have batch inputs
+        :param softmax: True, if you want to apply softmax on the preferences (Q) output.Default is False
+        :param show_dim_jac: True, if you wish to check Layers names and dimension used to calculate the Jacobian
+        :return: list, where list[0] is ntk tensor, and list[1] is Jacobian. ntk = jac(x1) @ jac^T(x2)
+        """
         x1 = torch.tensor(x1, dtype=torch.float)
         x2 = torch.tensor(x2, dtype=torch.float)
         if not batch:
             x1 = x1.unsqueeze(0)
             x2 = x2.unsqueeze(0)
-        return self.policy.ntk(x1, x2, tau=self.tau, mode=mode)
+        return self.policy.ntk(x1, x2, tau=self.tau, mode=mode, softmax=softmax, show_dim_jac=show_dim_jac)

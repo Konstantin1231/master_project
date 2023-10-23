@@ -88,5 +88,32 @@ def run_episodes(agent, env, n_episodes=1, epsilon=0, render=False):
 
 
 def compute_decay(tau_end, tau_init, ngames, patience):
-    decay = tau_end ** (patience / ngames) / tau_init ** (patience / ngames)
-    return decay
+    return (tau_end / tau_init) ** (patience / ngames)
+
+def train_agent(agent, env, num_epoches, n_episodes, tau_end = 0.2, lr_end = 1e-07, patience = 100, clip_grad=False):
+    lr_init = agent.lr
+    env_reset(env)
+    # list to store loss/rewards
+    loss_list = []
+    # Train for a number of epochs
+    print(f"beta full = {agent.beta}")
+    for epoch in range(num_epoches):
+        # Collect episodes
+        if agent.name == "MTR":
+            episodes = run_episodes_mtr(agent, env, n_episodes=n_episodes)
+        else:
+            episodes = run_episodes(agent, env, n_episodes=n_episodes)
+        # Update the policy based on the episodes
+        loss_list.append(agent.train(episodes, clip_grad=False))
+        if epoch % patience == 0:
+            agent.tau = agent.tau * compute_decay(tau_end, agent.tau, num_epoches, patience)
+            agent.lr = agent.lr * compute_decay(lr_end, agent.lr, num_epoches, patience)
+            agent.set_optimazer()
+        if epoch % 20 == 0:
+            print(f"Epoch {epoch + 1}")
+            print(f"Learning rate {agent.lr * 1000} * 10^{-3}")
+            print(f"Reward: {loss_list[-1]}")
+        env_reset(env)
+    agent.lr = lr_init
+    close_env(env)
+    return loss_list

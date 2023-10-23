@@ -4,7 +4,7 @@ import numpy as np
 
 
 class CustomMazeEnv(gym.Env):
-    def __init__(self, maze_size=5, reward_pos=(4, 4), wall_pose = (2,2), reward = 20):
+    def __init__(self, maze_size=5, reward_pos=(4, 4), wall_pose = (2,2), reward = 20, one_hot_coded=False):
         super(CustomMazeEnv, self).__init__()
 
         # Define the maze dimensions (e.g., 5x5 grid)
@@ -22,6 +22,7 @@ class CustomMazeEnv(gym.Env):
         # Define the maze layout (0: empty, 1: obstacle)
         self.maze = np.zeros((self.grid_size, self.grid_size))
         self.maze[wall_pose[0], wall_pose[1]] = 1  # Example obstacle
+        self.one_hot_coded = one_hot_coded
 
     def step(self, action):
         # Implement the dynamics of the maze
@@ -47,13 +48,18 @@ class CustomMazeEnv(gym.Env):
         else:
             reward = - 1
             done = False
-
-        return list(self.agent_position), reward, done, {}, {}
+        if self.one_hot_coded:
+            return np.eye(self.grid_size**2)[self.agent_position[1]*self.grid_size + self.agent_position[0], :], reward, done, {}, {}
+        else:
+            return list(self.agent_position), reward, done, {}, {}
 
     def reset(self):
         # Reset the agent's position to the starting point
-        self.agent_position = (0, 0)
-        return list(self.agent_position), {}
+        self.agent_position = [0, 0]
+        if self.one_hot_coded:
+            return np.eye(self.grid_size**2)[self.agent_position[1]*self.grid_size + self.agent_position[0], :], {}
+        else:
+            return list(self.agent_position), {}
 
     def render(self):
         # Implement visualization of the maze (optional)

@@ -62,8 +62,16 @@ def game_setup(game_name, render=False):
         obs_dim = len(obs)
         action_dim = env.action_space.n
     elif game_name == "Maze":
-        env = CustomMazeEnv()
-        obs_dim = 2
+        size = 5
+        one_hot_coded = True
+        reward_pos = (4, 4)
+        wall_pose = (2,2)
+        reward = 100
+        env = CustomMazeEnv(maze_size=size, reward_pos = reward_pos, wall_pose=wall_pose, reward=reward, one_hot_coded=one_hot_coded)
+        if one_hot_coded:
+            obs_dim = env.grid_size**2
+        else:
+            obs_dim = 2
         action_dim = env.action_space.n
     elif game_name == "Car":
         if render == True:
@@ -108,19 +116,13 @@ from utils import run_episodes, run_episodes_mtr
 
 
 def render(agent, env,n_episodes=2):
-    game_name = agent.game_name
-    if game_name in ["Toy", "Maze"]:
-        if agent.name == "REIN":
-            run_episodes(agent, env, n_episodes=n_episodes, game=game_name, render=True)
-        elif agent.name in ["MTR", "MtrNet","OriginalMtr" ]:
-            agent.tau = 0.001
-            run_episodes_mtr(agent, env, n_episodes=n_episodes, game=game_name, render=True)
+    agent.tau = 0.001
+    if agent.game_name not in ["Toy", "Maze"]:
+        env, _, _ = game_setup(agent.game_name, render=True)
+    if agent.name == "MTR":
+        run_episodes_mtr(agent, env, n_episodes=n_episodes, render=True)
     else:
-        env, _, _ = game_setup(game_name, render=True)
-        if agent.name == "REIN":
-            run_episodes(agent, env, n_episodes=n_episodes, game=game_name)
-        elif agent.name in ["MTR", "MtrNet","OriginalMtr" ]:
-            agent.tau = 0.001
-            run_episodes_mtr(agent, env, n_episodes=n_episodes, game=game_name)
+        run_episodes(agent, env, n_episodes=n_episodes, render=True)
+
 
     env.close()
