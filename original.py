@@ -70,7 +70,7 @@ class OriginalMTR(nn.Module):
         return
 
     def value(self, x, horizen_step, tau):
-        return tau * torch.log((torch.exp(self.forward(x, horizen_step, tau) / tau).sum() / self.output_size))
+        return tau * torch.log((torch.exp(self.forward(x, horizen_step, tau, softmax=False) / tau).sum() / self.output_size))
 
     def ntk(self, x1, x2, block_idx, tau=1, mode="full", softmax=False, show_dim_jac=False):
         """
@@ -227,6 +227,7 @@ class OriginalMtrAgent:
     def ntk(self, x1, x2, step, mode="full", batch=False, softmax=False, show_dim_jac=False):
         """
         NTK (NEURAL TANGENT KERNEL)
+        :param step: game step (starting from 1)
         :param x1: first input tensor (can be in batch)
         :param x2: second input tensor (can be in batch)
         :param mode: two options: "full", "trace"

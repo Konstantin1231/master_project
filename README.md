@@ -96,12 +96,16 @@ The Toy Environment is a simple game described in our work ( https://arxiv.org/p
 
 Here are the upcoming features and improvements planned for the Matryoshka Algo project:
 
-1. **Working NTK for Fully Connected NN:** We aim to develop a functional Neural Tangent Kernel (NTK) implementation for the fully connected neural network used in our first Matryoshka algorithm implementation. 
+1. Toy example: code method to calculate q_n_star
 
-2. **Dynamical tau and learning rate.
+2. EOC(edge of chaos) estimation. 
 
 
-## New* TOY environment 
+
+
+# *Update 17.10.2023
+
+## TOY environment 
 
 In recent update, we have added new game environment "Toy".
 The object class can be found in the toy.py.
@@ -118,7 +122,7 @@ In addition, the Toy.render() method, will prepare a plot, that shows the curren
 
 ![](images/picture2.png)
 
-## New* Matryoshka NET (MTRNet)
+## Matryoshka NET (MTRNet)
 
 New custom ResNet. As we have already mentioned, this implementation offers a different perspective on the algorithm's implementation. Which is closer, to the idea of the original algorithm.
 We propose to try two versions (Can be found in MtrNet file):
@@ -129,9 +133,54 @@ We propose to try two versions (Can be found in MtrNet file):
 
 ![](images/toy.png)
 
-## New* Original Matryoshka Algorithm 
+## Original Matryoshka Algorithm 
 
 The algorithm can be found in original.py file. Whereas, OriginalMtrAgent uses independant approximation function for each pi_i policy. 
-
 ![](images/Toy_4.jpg)
+
+# *Update 24.10.2023
+
+### General:
+ - one_hot_encoded option for Maze environment 
+ - fixed crashes, related to the out of range index in early terminated episodes "Cart"/"Pendulum" 
+ - MtrNet.forward() now has step parameter as input. And calculate only policies up to "step"
+ - .forward() for all NN, now has boolean parameter "softmax", when set to False, forward will output the preference. When set to True, will apply softmax on the output. By default: True
+ - MTRNet,now, has an option to set number of parameters per block in decreasing order. By setting "dynamical_layer_param=True" at agent initialization.
+
+## NTK (Neural Tangent Kernel)
+Each Agent has ability to call .ntk() method:
+
+![](images/ntk.png)
+
+By default, ntk do not accept batch inputs. So, one should set batch = True, if input tensors have batch dimensions. 
+How it works:
+   - horizon_step = horizon - step
+   - find parameters theta_horizon_step (parameters used to produce policy for given horizon_step)
+   - calculate jacobian (jac) of .forward(x_i, horizon_step, softmax=False) with respect to the theta_horizon_step
+   - finally, ntk = jac(x1) @ jac^T(x2)
+
+## Dynamical LR and TAU
+
+In order to get rid-off repetitive code, I have added new "train_agent" function in utils.py. That will launch episodes run and training, and additionally will collect rewards gained after each epoch.
+
+![](images/train_agent.png)
+
+After "patience" number of epochs, we update learning rate and tau according to decay factor:
+
+![](images/decay.png)
+
+Remark: To get static tau and lr, set:
+ - tau_end = agent.tau
+ - lr_end = agent.lr
+
+## ShortLongNet
+
+Short-Long net is an adaptation of the MTRNet, to the environments with high horizon. 
+Differently, from MTRNet, we do not associate a NN block with each horizon step. Instead, we associate one bloxk with a group of horizons steps.
+At initialization of agent "ShortLongAgent", one should provide:
+ *  perc_list = [0.03, 0.06, 0.1, 0.16, 0.26, 0.38, 0.5, 0.65, 0.8] #example
+that indicates what is a percentile of horizon is used within different blocks. 
+For example, for horizon_step that fall in the interval [0.06, 0.1]*horizon we use block #2. For [0.1, 0.16]*horizon, block #3.
+
+
 

@@ -64,10 +64,10 @@ def run_episodes(agent, env, n_episodes=1, epsilon=0, render=False):
             env.render()
         step = 1
         while not terminated and step <= agent.horizon:
-            if agent.name in ["MtrNet", "ReinMtrNet", "OriginalMtr"]:
-                action, probs, action_value = agent.select_action(state, step)
-            else:
+            if agent.name in ["REIN"]:
                 action, probs, action_value = agent.select_action(state)
+            else:
+                action, probs, action_value = agent.select_action(state, step)
             if random.uniform(0, 1) < epsilon:
                 next_state, reward, terminated, truncated, info, action = run_env_step(env, action=action_value,
                                                                                        random_action=True,
@@ -90,8 +90,21 @@ def run_episodes(agent, env, n_episodes=1, epsilon=0, render=False):
 def compute_decay(tau_end, tau_init, ngames, patience):
     return (tau_end / tau_init) ** (patience / ngames)
 
-def train_agent(agent, env, num_epoches, n_episodes, tau_end = 0.2, lr_end = 1e-07, patience = 100, clip_grad=False):
+
+def train_agent(agent, env, num_epoches, n_episodes, tau_end=0.2, lr_end=1e-07, patience=100, clip_grad=False):
+    """
+    :param agent: Agent
+    :param env: Environment
+    :param num_epoches: number of epochs (for training)
+    :param n_episodes: number of episodes per epoch
+    :param tau_end: Tau at the end of the training
+    :param lr_end: Learning rate at the end of the training
+    :param patience: Update frequency for agent.tau and agent.lr
+    :param clip_grad: clip gradients
+    :return: List of total rewards average (average over n_episodes)
+    """
     lr_init = agent.lr
+    tau_init = agent.tau
     env_reset(env)
     # list to store loss/rewards
     loss_list = []
@@ -111,9 +124,12 @@ def train_agent(agent, env, num_epoches, n_episodes, tau_end = 0.2, lr_end = 1e-
             agent.set_optimazer()
         if epoch % 20 == 0:
             print(f"Epoch {epoch + 1}")
-            print(f"Learning rate {agent.lr * 1000} * 10^{-3}")
+            print(f"tau {agent.tau:.3f}")
+            print(f"Learning rate {(agent.lr * 1000):.5f} " + "* 10^-3")
             print(f"Reward: {loss_list[-1]}")
+            print()
         env_reset(env)
     agent.lr = lr_init
+    agent.tau = tau_init
     close_env(env)
     return loss_list

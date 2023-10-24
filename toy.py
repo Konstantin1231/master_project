@@ -14,6 +14,7 @@ class Toy_env():
         self.alphas = alphas
         self.basis = self.generate_basis(random=random_basis)
         self.q_star_1 = self.generate_q_star_1()
+        self.q_star_2 = self.generate_q_star_2()
         self.one_hot_coded = one_hot_coded
 
     def return_random_state(self):
@@ -46,17 +47,30 @@ class Toy_env():
         return basis
 
     def generate_q_star_1(self):
-        self.q_star_1 = np.zeros((self.n_states, self.n_actions))
+        q_star_1 = np.zeros((self.n_states, self.n_actions))
         for i in range(self.n_states):
-            self.q_star_1 += self.alphas[i] * self.basis[i, :, :]
-        return self.q_star_1
+            q_star_1 += self.alphas[i] * self.basis[i, :, :]
+        return q_star_1
 
-    def pi_1(self):
+    def generate_q_star_2(self):
+        q_2 = np.zeros((self.n_states, self.n_actions))
+
+        for state in range(self.n_states):
+            for action in range(self.n_actions):  # offset by -1
+                next_state = (state + (action + 1)) % self.n_states
+                prefs = self.q_star_1[next_state, :]
+                v_star = np.log((np.exp(prefs)).sum() / (self.n_actions))
+                q_2[state, action] = self.q_star_1[state, action] + v_star
+        return q_2
+
+    def pi_(self, preference):
+        """"
+        :param preference: Q_i
+        :return: Softmax policy based on the Q_i reference
+        """
         policy = np.zeros((self.n_states, self.n_actions))
-
         for i in range(self.n_states):
-            policy[i, :] = np.exp(self.q_star_1[i, :]) / (np.exp(self.q_star_1[i, 0]) + np.exp(self.q_star_1[i, 1]))
-
+            policy[i, :] = np.exp(preference[i, :]) / (np.exp(preference[i, 0]) + np.exp(preference[i, 1]))
         return policy
 
     def render(self):
@@ -96,28 +110,3 @@ class Toy_env():
         self.reset()
         # Closes all the figure windows.
         plt.close('all')
-
-
-def get_policy_from_theta_basis(thetas, basis):
-    n_basis, n_states, n_actions = basis.shape
-    preference = np.zeros((n_states, n_actions))
-
-    for i in range(n_basis):
-        preference += thetas[i] * basis[i, :, :]
-
-    policy = np.zeros((n_states, n_actions))
-
-    for i in range(n_states):
-        policy[i, :] = np.exp(preference[i, :]) / (np.exp(preference[i, 0]) + np.exp(preference[i, 1]))
-
-    return preference, policy
-
-
-def get_policy_from_preference(q):
-    n_states, n_actions = q.shape
-    policy = np.zeros((n_states, n_actions))
-
-    for i in range(n_states):
-        policy[i, :] = np.exp(q[i, :]) / (np.exp(q[i, 0]) + np.exp(q[i, 1]))
-
-    return policy
