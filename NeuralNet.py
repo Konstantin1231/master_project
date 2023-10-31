@@ -26,9 +26,11 @@ class CustomLoss(nn.Module):
 # Step 2: Define the policy model.
 # A neural network which, given a state, outputs a probability distribution over actions.
 class PolicyNet(nn.Module):
-    def __init__(self, n_inputs, n_outputs, hidden_dim):
+    def __init__(self, n_inputs = 1, n_outputs= 1, hidden_dim= 2):
         super(PolicyNet, self).__init__()
         # Defining a simple neural network with one hidden layer.
+        self.sigma_w = None
+        self.sigma_b = None
         self.fc = nn.Sequential(
             nn.Linear(n_inputs, hidden_dim),  # Input layer
             nn.ReLU(),  # Activation function
@@ -36,7 +38,7 @@ class PolicyNet(nn.Module):
         )
         self.output_size = n_outputs
         self.softmax = nn.Softmax(dim=-1)
-
+        self.ntk_init()
     def forward(self, x, tau=1, softmax=True):
         x = self.fc(x)  # dividing by tau before
         # we apply softmax
@@ -72,7 +74,15 @@ class PolicyNet(nn.Module):
         return total_params
 
     # Initialize weights of NN according to the scheme presented on the  page 102 EPFL_TH9825.pdf
-    def ntk_init(self, beta=0.5):
+    def ntk_init(self, sigma_w=np.sqrt(2), sigma_b=0):
+        """
+        NTK parametrization.
+        :param sigma_w: sigma_w * W
+        :param sigma_b: sigma_b * bias
+        :return: None
+        """
+        self.sigma_b = sigma_b
+        self.sigma_w = sigma_w
 
         # beta parameter to control chaos order
         def init_weights(m):
@@ -80,11 +90,11 @@ class PolicyNet(nn.Module):
                 # Initialize weights as standard Gaussian RVs
                 nn.init.normal_(m.weight, mean=0, std=1)
                 # Multiply weights by the given scalar
-                m.weight.data *= ((1 - beta ** 2) / m.weight.data.size(1)) ** 0.5
+                m.weight.data *= sigma_w /(m.weight.data.size(1) ** 0.5 )
                 # Initialize biases as standard Gaussian RVs
                 nn.init.normal_(m.bias, mean=0, std=1)
                 # Multiply biases by the given scalar
-                m.bias.data *= beta
+                m.bias.data *= sigma_b
 
         self.apply(init_weights)
         return
@@ -143,12 +153,12 @@ class PolicyNet(nn.Module):
 
 
 class ReinforceAgent:
-    def __init__(self, n_inputs, n_outputs, hidden_dim, game_name, horizon=100000, beta=0.5, learning_rate=1e-3, tau=1):
+    def __init__(self, n_inputs, n_outputs, hidden_dim, game_name, horizon=100000, learning_rate=1e-3, tau=1):
         self.policy = PolicyNet(n_inputs, n_outputs, hidden_dim)
         self.optimizer = optim.Adam(self.policy.parameters(), lr=learning_rate)
         self.ObsSpaceDim = n_inputs
         self.n_action = n_outputs
-        self.beta = beta
+        self.beta = self.policy.sigma_b
         self.tau = tau
         self.horizon = horizon
         self.game_name = game_name
@@ -224,14 +234,14 @@ class ReinforceAgent:
 
 
 class MTRAgent:
-    def __init__(self, n_inputs, n_outputs, hidden_dim, horizon, game_name, tau=1, beta=0.5, learning_rate=1e-3):
+    def __init__(self, n_inputs, n_outputs, hidden_dim, horizon, game_name, tau=1, learning_rate=1e-3):
         self.policy = PolicyNet(n_inputs + 1, n_outputs, hidden_dim)
         self.optimizer = optim.Adam(self.policy.parameters(), lr=learning_rate)
         self.ObsSpaceDim = n_inputs
         self.n_action = n_outputs
         self.horizon = horizon
         self.tau = tau
-        self.beta = beta
+        self.beta = self.policy.sigma_b
         self.lr = learning_rate
         self.game_name = game_name
         self.name = "MTR"

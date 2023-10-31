@@ -19,17 +19,21 @@ def run_episodes_mtr(agent, env, n_episodes=1, render=False):
         # Initialize variables for each episode
         episode = []
         state, _ = initialize_env(env, obs_dim=obs_dim)
-        if render:
-            env.render()
         step = 1
         terminated = False
         # Run each episode until it is terminated or the horizon is reached
         while not terminated and step <= horizon:
+
             input_vector = np.zeros(agent.ObsSpaceDim + 1)
             input_vector[:agent.ObsSpaceDim] = state
             input_vector[-1] = (agent.horizon - step) / agent.horizon
             # Initialize the input vector and set its elements
             action, probs, action_value = agent.select_action(input_vector)
+            if render:
+                if agent.game_name == "Toy":
+                    env.render(agent.horizon, action, probs[action].detach().numpy(), step)
+                else:
+                    env.render()
             # Execute the sampled action in the environment and observe the next state, reward, and termination signal
             next_state, reward, terminated, truncated, info, _ = run_env_step(env, action=action_value,
                                                                               random_action=False, obs_dim=obs_dim)
@@ -38,8 +42,7 @@ def run_episodes_mtr(agent, env, n_episodes=1, render=False):
             # Append the experience tuple to the episode
             episode.append((input_vector, step, action, reward_new, probs[action].detach().numpy()))
             # Update the current state and time step
-            if render:
-                env.render()
+
             state = next_state
             step += 1
         # Append the completed episode to the list of episodes
@@ -55,19 +58,22 @@ def run_episodes(agent, env, n_episodes=1, epsilon=0, render=False):
     run = 0
     episodes = []
     obs_dim = agent.ObsSpaceDim
-    while (run < n_episodes):
+    while run < n_episodes:
         episode = []
         truncated = False
         terminated = False
         state, _ = initialize_env(env, obs_dim=obs_dim)
-        if render:
-            env.render()
         step = 1
         while not terminated and step <= agent.horizon:
             if agent.name in ["REIN"]:
                 action, probs, action_value = agent.select_action(state)
             else:
                 action, probs, action_value = agent.select_action(state, step)
+            if render:
+                if agent.game_name == "Toy":
+                    env.render(agent.horizon, action, probs[action].detach().numpy(), step)
+                else:
+                    env.render()
             if random.uniform(0, 1) < epsilon:
                 next_state, reward, terminated, truncated, info, action = run_env_step(env, action=action_value,
                                                                                        random_action=True,
@@ -77,8 +83,7 @@ def run_episodes(agent, env, n_episodes=1, epsilon=0, render=False):
                                                                                   random_action=False, obs_dim=obs_dim)
             reward_new = custom_reward(state, reward, terminated, game_name=agent.game_name)
             episode.append((state, step, action, reward_new, probs[action].detach().numpy()))
-            if render:
-                env.render()
+
             state = next_state
             step += 1
         episodes.append(episode)

@@ -39,10 +39,13 @@ class SimpleBlock(nn.Module):
 class OriginalMTR(nn.Module):
     def __init__(self, n_inputs, n_actions, hidden_dim, n_blocks):
         super(OriginalMTR, self).__init__()
+        self.sigma_b = None
+        self.sigma_2 = None
         self.Q = nn.ModuleList([SimpleBlock(n_inputs, n_actions, hidden_dim=hidden_dim) for _ in range(n_blocks)])
         self.softmax = nn.Softmax(dim=-1)
         self.output_size = n_actions
         self.horizon = n_blocks
+        self.ntk_init()
 
     def forward(self, x, horizen_step, tau=1, softmax=True):
         # Select the neural network based on the step
@@ -53,18 +56,26 @@ class OriginalMTR(nn.Module):
             return Q_i(x)
 
     # Initialize weights of NN according to the scheme presented on the  page 102 EPFL_TH9825.pdf
-    def ntk_init(self, beta=0.5):
+    def ntk_init(self, sigma_w=np.sqrt(2), sigma_b=0):
+        """
+        NTK parametrization.
+        :param sigma_w: sigma_w * W
+        :param sigma_b: sigma_b * bias
+        :return: None
+        """
+        self.sigma_2 = sigma_w
+        self.sigma_b = sigma_b
         # beta parameter to control chaos order
         def init_weights(m):
             if isinstance(m, nn.Linear):
                 # Initialize weights as standard Gaussian RVs
                 nn.init.normal_(m.weight, mean=0, std=1)
                 # Multiply weights by the given scalar
-                m.weight.data *= ((1 - beta ** 2) / m.weight.data.size(1)) ** 0.5
+                m.weight.data *= sigma_w /(m.weight.data.size(1) ** 0.5 )
                 # Initialize biases as standard Gaussian RVs
                 nn.init.normal_(m.bias, mean=0, std=1)
                 # Multiply biases by the given scalar
-                m.bias.data *= beta
+                m.bias.data *= sigma_b
 
         self.apply(init_weights)
         return
@@ -154,14 +165,14 @@ class OriginalMTR(nn.Module):
 
 
 class OriginalMtrAgent:
-    def __init__(self, n_inputs, n_outputs, hidden_dim, horizon, game_name, tau=1, beta=0.5, learning_rate=1e-3):
+    def __init__(self, n_inputs, n_outputs, hidden_dim, horizon, game_name, tau=1, learning_rate=1e-3):
         self.horizon = horizon
         self.policy = OriginalMTR(n_inputs, n_outputs, hidden_dim, horizon)
         self.optimizer = [optim.Adam(Q_i.parameters(), lr=learning_rate) for Q_i in self.policy.Q]
         self.ObsSpaceDim = n_inputs
         self.n_action = n_outputs
         self.tau = tau
-        self.beta = beta
+        self.beta = self.policy.sigma_b
         self.lr = learning_rate
         self.horizon = horizon
         self.game_name = game_name

@@ -101,7 +101,7 @@ def game_setup(game_name, render=False):
         action_dim = nOutput
     elif game_name == "Toy":
         alphas = [0.5, 1, -1, 2, 0.2, -0.7, 1, -0.2, 7]
-        random_basis = True
+        random_basis = False
         one_hot_coded = True
         env = Toy_env(alphas, random_basis=random_basis, one_hot_coded=one_hot_coded)
         if one_hot_coded:
@@ -116,7 +116,6 @@ from utils import run_episodes, run_episodes_mtr
 
 
 def render(agent, env,n_episodes=2):
-    agent.tau = 0.001
     if agent.game_name not in ["Toy", "Maze"]:
         env, _, _ = game_setup(agent.game_name, render=True)
     if agent.name == "MTR":

@@ -6,12 +6,7 @@ from ntk import empirical_ntk_ntk_vps, empirical_ntk_jacobian_contraction
 from torch.func import functional_call
 import copy
 import pickle
-
-
-
-
-
-
+from NeuralNet import PolicyNet
 
 class CustomLoss(nn.Module):
     """ to simplify the gradient computation and applying log to the output of the  network"""
@@ -43,27 +38,35 @@ class SimpleBlock(nn.Module):
         return out
 
 
+
+
 class MtrNet(nn.Module):
     def __init__(self, n_inputs, n_actions, hidden_dim, n_blocks, dynamical_layer_param=False):
         super(MtrNet, self).__init__()
         # Using _modules to set the block with a particular name
         # Create an OrderedDict to hold the blocks
-       # self.blocks = nn.ModuleDict({
-       #      f'block_{i+1}': SimpleBlock(n_inputs, n_actions, hidden_dim=hidden_dim)
-       #     for i in range(n_blocks)
-       # })
+        # self.blocks = nn.ModuleDict({
+        #      f'block_{i+1}': SimpleBlock(n_inputs, n_actions, hidden_dim=hidden_dim)
+        #     for i in range(n_blocks)
+        # })
+        self.sigma_b = None
+        self.sigma_2 = None
         if dynamical_layer_param:
             self.blocks = nn.ModuleList(
-                [SimpleBlock(n_inputs, n_actions, hidden_dim=int(n_actions + (hidden_dim-n_actions) * (n_blocks-i) / n_blocks)) for i in range(n_blocks)])
+                [SimpleBlock(n_inputs, n_actions,
+                             hidden_dim=int(n_actions + (hidden_dim - n_actions) * (n_blocks - i) / n_blocks)) for i in
+                 range(n_blocks)])
         else:
-            self.blocks = nn.ModuleList([SimpleBlock(n_inputs, n_actions, hidden_dim=hidden_dim) for _ in range(n_blocks)])
+            self.blocks = nn.ModuleList(
+                [SimpleBlock(n_inputs, n_actions, hidden_dim=hidden_dim) for _ in range(n_blocks)])
         self.softmax = nn.Softmax(dim=-1)
         self.output_size = n_actions
+        self.ntk_init()
 
     def forward(self, x, horizen_step, tau=1, softmax=True):
         prev_output = None
-        for block in self.blocks[:horizen_step+1]:
-            #print([name for name, param in self.blocks[:horizen_step+1].named_parameters()])
+        for block in self.blocks[:horizen_step + 1]:
+            # print([name for name, param in self.blocks[:horizen_step+1].named_parameters()])
             prev_output = block(x, prev_output)  # passing the original input and the output from the previous block
         if softmax:
             return self.softmax(prev_output / tau)
@@ -71,7 +74,15 @@ class MtrNet(nn.Module):
             return prev_output
 
     # Initialize weights of NN according to the scheme presented on the  page 102 EPFL_TH9825.pdf
-    def ntk_init(self, beta=0.5):
+    def ntk_init(self, sigma_w=np.sqrt(2), sigma_b=0):
+        """
+        NTK parametrization.
+        :param sigma_w: sigma_w * W
+        :param sigma_b: sigma_b * bias
+        :return: None
+        """
+        self.sigma_2 = sigma_w
+        self.sigma_b = sigma_b
 
         # beta parameter to control chaos order
         def init_weights(m):
@@ -79,17 +90,18 @@ class MtrNet(nn.Module):
                 # Initialize weights as standard Gaussian RVs
                 nn.init.normal_(m.weight, mean=0, std=1)
                 # Multiply weights by the given scalar
-                m.weight.data *= ((1 - beta ** 2) / m.weight.data.size(1)) ** 0.5
+                m.weight.data *= sigma_w / (m.weight.data.size(1) ** 0.5)
                 # Initialize biases as standard Gaussian RVs
                 nn.init.normal_(m.bias, mean=0, std=1)
                 # Multiply biases by the given scalar
-                m.bias.data *= beta
+                m.bias.data *= sigma_b
 
         self.apply(init_weights)
         return
 
     def value(self, x, horizen_step, tau):
-        return tau * torch.log((torch.exp(self.forward(x,horizen_step, tau, softmax=False) / tau).sum() / self.output_size))
+        return tau * torch.log(
+            (torch.exp(self.forward(x, horizen_step, tau, softmax=False) / tau).sum() / self.output_size))
 
     def ntk(self, x1, x2, block_idx, tau, mode="full", softmax=False, show_dim_jac=False):
         """
@@ -111,7 +123,6 @@ class MtrNet(nn.Module):
         result = empirical_ntk_jacobian_contraction(fnet_single, params, x1, x2, mode, show_dim_jac=show_dim_jac)
         return result
 
-
     def count_parameters_in_block(self, block_idx):
         total_params = 0
         for name, parameter in self.named_parameters():
@@ -122,9 +133,8 @@ class MtrNet(nn.Module):
     def total_number_parameters(self):
         total_params = 0
         for name, parameter in self.named_parameters():
-                total_params += parameter.numel()  # numel returns the total number of elements in the tensor
+            total_params += parameter.numel()  # numel returns the total number of elements in the tensor
         return total_params
-
 
     def save_parameters(self, file_path):
         """
@@ -147,6 +157,7 @@ class MtrNet(nn.Module):
             self.load_state_dict(pickle.load(file))
 
     """ Methods COPIED FROM Hanveiga """
+
     def norm_param(self):
         # prints norm of parameters per layer
         print("The weights per layer of the NN have norm:")
@@ -174,14 +185,15 @@ class MtrNet(nn.Module):
 
 
 class ReinforceMtrNetAgent:
-    def __init__(self, n_inputs, n_outputs, hidden_dim, horizon, game_name, tau=1, beta=0.5, learning_rate=1e-3, dynamical_layer_param=False):
+    def __init__(self, n_inputs, n_outputs, hidden_dim, horizon, game_name, tau=1, learning_rate=1e-3,
+                 dynamical_layer_param=False):
         self.horizon = horizon
-        self.policy = MtrNet(n_inputs, n_outputs, hidden_dim, horizon, dynamical_layer_param = dynamical_layer_param)
+        self.policy = MtrNet(n_inputs, n_outputs, hidden_dim, horizon, dynamical_layer_param=dynamical_layer_param)
         self.optimizer = optim.Adam(self.policy.parameters(), lr=learning_rate)
         self.ObsSpaceDim = n_inputs
         self.n_action = n_outputs
         self.tau = tau
-        self.beta = beta
+        self.beta = self.policy.sigma_b
         self.lr = learning_rate
         self.horizon = horizon
         self.game_name = game_name
@@ -198,7 +210,7 @@ class ReinforceMtrNetAgent:
         state_tensor = torch.tensor(state, dtype=torch.float)
         block_idx = self.horizon - step  # step starts from 1
         with torch.no_grad():
-            action_probs = self.policy(state_tensor,block_idx, tau=self.tau)
+            action_probs = self.policy(state_tensor, block_idx, tau=self.tau)
         action = torch.multinomial(action_probs, 1).item()
         if self.game_name == "Pendulum":
             possible_actions = np.linspace(-2, 2, self.n_action)
@@ -233,9 +245,8 @@ class ReinforceMtrNetAgent:
                 for param in self.policy.blocks[block_idx].parameters():
                     param.requires_grad = True
 
-
                 state_tensor = torch.FloatTensor(state).unsqueeze(0)
-                action_probs = self.policy(state_tensor,block_idx, tau=self.tau)
+                action_probs = self.policy(state_tensor, block_idx, tau=self.tau)
 
                 # Negative log likelihood of the taken action
                 loss = -torch.log(action_probs[0][action]) * returns[- step]
@@ -250,9 +261,7 @@ class ReinforceMtrNetAgent:
                 for param in self.policy.blocks[block_idx].parameters():
                     param.requires_grad = False
 
-
         return total_reward / len(episodes)
-
 
     def ntk(self, x1, x2, step, mode="full", batch=False, softmax=False, show_dim_jac=False):
         """
@@ -275,13 +284,14 @@ class ReinforceMtrNetAgent:
 
 
 class MtrNetAgent:
-    def __init__(self, n_inputs, n_outputs, hidden_dim, horizon, game_name, tau=1, beta=0.5, learning_rate=1e-3, dynamical_layer_param=False):
+    def __init__(self, n_inputs, n_outputs, hidden_dim, horizon, game_name, tau=1, learning_rate=1e-3,
+                 dynamical_layer_param=False):
         self.policy = MtrNet(n_inputs, n_outputs, hidden_dim, horizon, dynamical_layer_param=dynamical_layer_param)
         self.optimizer = optim.Adam(self.policy.parameters(), lr=learning_rate)
         self.ObsSpaceDim = n_inputs
         self.n_action = n_outputs
         self.tau = tau
-        self.beta = beta
+        self.beta = self.policy.sigma_b
         self.lr = learning_rate
         self.horizon = horizon
         self.game_name = game_name
@@ -298,7 +308,7 @@ class MtrNetAgent:
         state_tensor = torch.tensor(state, dtype=torch.float)
         block_idx = self.horizon - step  # step starts from 1
         with torch.no_grad():
-            action_probs  = self.policy(state_tensor,block_idx, tau=self.tau)
+            action_probs = self.policy(state_tensor, block_idx, tau=self.tau)
         action = torch.multinomial(action_probs, 1).item()
         if self.game_name == "Pendulum":
             possible_actions = np.linspace(-2, 2, self.n_action)
@@ -338,7 +348,7 @@ class MtrNetAgent:
                     param.requires_grad = True
 
                 state_tensor = torch.FloatTensor(state).unsqueeze(0)
-                action_probs = self.policy(state_tensor,block_idx, tau=self.tau)
+                action_probs = self.policy(state_tensor, block_idx, tau=self.tau)
 
                 # Compute the policy gradient loss
                 loss = CustomLoss(C[block_idx])
@@ -376,7 +386,8 @@ class MtrNetAgent:
 
 
 class ShortLongAgent:
-    def __init__(self, n_inputs, n_outputs, hidden_dim, horizon, game_name, perc_list=None, tau=1, beta=0.5, learning_rate=1e-3, dynamical_layer_param=False):
+    def __init__(self, n_inputs, n_outputs, hidden_dim, horizon, game_name, perc_list=None, tau=1, learning_rate=1e-3,
+                 dynamical_layer_param=False):
         self.horizon = horizon
         if perc_list == None:
             self.perc_list = [0.03, 0.06, 0.1, 0.16, 0.26, 0.38, 0.5, 0.65, 0.8]
@@ -388,7 +399,7 @@ class ShortLongAgent:
         self.ObsSpaceDim = n_inputs
         self.n_action = n_outputs
         self.tau = tau
-        self.beta = beta
+        self.beta = self.policy.sigma_b
         self.lr = learning_rate
         self.game_name = game_name
         self.name = "ShortLongNet"
@@ -404,7 +415,7 @@ class ShortLongAgent:
         state_tensor = torch.tensor(state, dtype=torch.float)
         block_idx = self.block_idx(self.horizon - step)  # step starts from 1
         with torch.no_grad():
-            action_probs  = self.policy(state_tensor,block_idx, tau=self.tau)
+            action_probs = self.policy(state_tensor, block_idx, tau=self.tau)
         action = torch.multinomial(action_probs, 1).item()
         if self.game_name == "Pendulum":
             possible_actions = np.linspace(-2, 2, self.n_action)
@@ -444,7 +455,7 @@ class ShortLongAgent:
                     param.requires_grad = True
 
                 state_tensor = torch.FloatTensor(state).unsqueeze(0)
-                action_probs = self.policy(state_tensor,block_idx, tau=self.tau)
+                action_probs = self.policy(state_tensor, block_idx, tau=self.tau)
 
                 # Compute the policy gradient loss
                 loss = CustomLoss(C[block_idx])
@@ -468,7 +479,7 @@ class ShortLongAgent:
             if horizon_step <= perc_hor_list[i]:
                 break
             else:
-                i+=1
+                i += 1
         return i
 
     def ntk(self, x1, x2, step, mode="full", batch=False, softmax=False, show_dim_jac=False):
