@@ -7,6 +7,9 @@
 - [Setup](#setup)
 - [Results](#results)
 - [To-Do List](#to-do-list)
+- [*Update 17.10.2023](#*Update 17.10.2023)
+- [*Update 24.10.2023](#*Update 24.10.2023)
+- [*Update 31.10.2023](#*Update 31.10.2023)
 
 ## Introduction
 
@@ -182,5 +185,24 @@ At initialization of agent "ShortLongAgent", one should provide:
 that indicates what is a percentile of horizon is used within different blocks. 
 For example, for horizon_step that fall in the interval [0.06, 0.1]*horizon we use block #2. For [0.1, 0.16]*horizon, block #3.
 
+# *Update 31.10.2023
 
+## New features for Toy environment 
+### Q_star/V_star
+Now one can generate and store Q_star and V_star values, using bew method: generate_all_q_stars(horizon, step_hor=2, tau=1)
+Parameters:
+- horizon: usually you want to set one, used during the training
+- step-hor: Always starts with 2. (Needed for recurrence )
+- tau: usually you want to set one, used during the training \
+- output: dictionary .q_star and .v_star
+Example
 
+![](images/q_star.png)
+
+### New render function
+- green circle: the optimal decision based on the optimal policy. Inside circle, we indicate the action value Q_star of the current step horizon.
+- red circle: non-optimal choice. As well with the value of the current action value.
+- arrow: the decision made by the agent. Green if the decision is the same with optimal one.
+- value inside current state, is a probability of the agent action choice. 
+
+![](images/render_1.png)
