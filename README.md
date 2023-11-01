@@ -202,7 +202,7 @@ Example
 ### New render function
 - green circle: the optimal decision based on the optimal policy. Inside circle, we indicate the action value Q_star of the current step horizon.
 - red circle: non-optimal choice. As well with the value of the current action value.
-- arrow: the decision made by the agent. Green if the decision is the same with optimal one.
+- arrow: the decision made by the agent. Green if the decision is the same with an optimal one.
 - value inside current state, is a probability of the agent action choice. 
 
 ![](images/render_1.png)
