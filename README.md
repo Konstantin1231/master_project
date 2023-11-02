@@ -7,9 +7,9 @@
 - [Setup](#setup)
 - [Results](#results)
 - [To-Do List](#to-do-list)
-- [*Update 17.10.2023](#*Update 17.10.2023)
-- [*Update 24.10.2023](#*Update 24.10.2023)
-- [*Update 31.10.2023](#*Update 31.10.2023)
+- [Update 17.10.2023](#update-17102023)
+- [Update 24-10.2023](#update-24102023)
+- [Update 31.10.2023](#update-31102023)
 
 ## Introduction
 
@@ -106,9 +106,9 @@ Here are the upcoming features and improvements planned for the Matryoshka Algo 
 
 
 
-# *Update 17.10.2023
+## Update 17.10.2023
 
-## TOY environment 
+### TOY environment 
 
 In recent update, we have added new game environment "Toy".
 The object class can be found in the toy.py.
@@ -125,7 +125,7 @@ In addition, the Toy.render() method, will prepare a plot, that shows the curren
 
 ![](images/picture2.png)
 
-## Matryoshka NET (MTRNet)
+### Matryoshka NET (MTRNet)
 
 New custom ResNet. As we have already mentioned, this implementation offers a different perspective on the algorithm's implementation. Which is closer, to the idea of the original algorithm.
 We propose to try two versions (Can be found in MtrNet file):
@@ -136,12 +136,12 @@ We propose to try two versions (Can be found in MtrNet file):
 
 ![](images/toy.png)
 
-## Original Matryoshka Algorithm 
+### Original Matryoshka Algorithm 
 
 The algorithm can be found in original.py file. Whereas, OriginalMtrAgent uses independant approximation function for each pi_i policy. 
 ![](images/Toy_4.jpg)
 
-# *Update 24.10.2023
+## Update 24.10.2023
 
 ### General:
  - one_hot_encoded option for Maze environment 
@@ -150,7 +150,7 @@ The algorithm can be found in original.py file. Whereas, OriginalMtrAgent uses i
  - .forward() for all NN, now has boolean parameter "softmax", when set to False, forward will output the preference. When set to True, will apply softmax on the output. By default: True
  - MTRNet,now, has an option to set number of parameters per block in decreasing order. By setting "dynamical_layer_param=True" at agent initialization.
 
-## NTK (Neural Tangent Kernel)
+### NTK (Neural Tangent Kernel)
 Each Agent has ability to call .ntk() method:
 
 ![](images/ntk.png)
@@ -162,7 +162,7 @@ How it works:
    - calculate jacobian (jac) of .forward(x_i, horizon_step, softmax=False) with respect to the theta_horizon_step
    - finally, ntk = jac(x1) @ jac^T(x2)
 
-## Dynamical LR and TAU
+### Dynamical LR and TAU
 
 In order to get rid-off repetitive code, I have added new "train_agent" function in utils.py. That will launch episodes run and training, and additionally will collect rewards gained after each epoch.
 
@@ -176,7 +176,7 @@ Remark: To get static tau and lr, set:
  - tau_end = agent.tau
  - lr_end = agent.lr
 
-## ShortLongNet
+### ShortLongNet
 
 Short-Long net is an adaptation of the MTRNet, to the environments with high horizon. 
 Differently, from MTRNet, we do not associate a NN block with each horizon step. Instead, we associate one bloxk with a group of horizons steps.
@@ -185,10 +185,10 @@ At initialization of agent "ShortLongAgent", one should provide:
 that indicates what is a percentile of horizon is used within different blocks. 
 For example, for horizon_step that fall in the interval [0.06, 0.1]*horizon we use block #2. For [0.1, 0.16]*horizon, block #3.
 
-# *Update 31.10.2023
+## Update 31.10.2023
 
-## New features for Toy environment 
-### Q_star/V_star
+### New features for a Toy environment 
+#### Q_star/V_star
 Now one can generate and store Q_star and V_star values, using bew method: generate_all_q_stars(horizon, step_hor=2, tau=1)
 Parameters:
 - horizon: usually you want to set one, used during the training
@@ -199,7 +199,7 @@ Example
 
 ![](images/q_star.png)
 
-### New render function
+#### New render function
 - green circle: the optimal decision based on the optimal policy. Inside circle, we indicate the action value Q_star of the current step horizon.
 - red circle: non-optimal choice. As well with the value of the current action value.
 - arrow: the decision made by the agent. Green if the decision is the same with an optimal one.

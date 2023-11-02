@@ -168,7 +168,7 @@ class Toy_env():
                 color='black', fontsize=text_size)  # Adjust fontsize as needed
 
         plt.xlim(-2, self.n_states * 2)
-        plt.ylim(-1, 3)
+        plt.ylim(-0.1, 3)
         ax.set_aspect('equal', adjustable='box')
         plt.axis('off')
         plt.show()

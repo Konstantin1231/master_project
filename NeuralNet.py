@@ -212,7 +212,7 @@ class ReinforceAgent:
                 torch.nn.utils.clip_grad_value_(self.policy.parameters(), clip_value=10)
             self.optimizer.step()
 
-        return total_reward / len(episodes)
+        return total_reward / len(episodes), total_reward / len(episodes)
 
     def ntk(self, x1, x2, mode="full", batch=False, softmax=False, show_dim_jac=False):
         """
@@ -268,6 +268,7 @@ class MTRAgent:
         # Initialize total_loss to store cumulative loss over all episodes
         # Iterate over each episode in episodes
         total_reward = 0
+        total_entropy_reward = 0
         for episode in episodes:
             # Initialize lists to store rewards and action probabilities for the episode
             reward_list = []
@@ -287,7 +288,7 @@ class MTRAgent:
             # last_state, _, _, _, _ = episode[-1]
             # entropy_rewards[-1] = entropy_rewards[-1] - self.policy.value(torch.FloatTensor(last_state), self.tau).detach().numpy()
             C = np.cumsum(entropy_rewards)
-
+            total_entropy_reward += C[-1]
             # Convert C to a float tensor for PyTorch calculations
             C = torch.FloatTensor(C)
             # Extract episode data and convert them to tensors for PyTorch calculations
@@ -309,7 +310,7 @@ class MTRAgent:
             self.optimizer.step()
 
         # Return the average loss across all episodes
-        return total_reward / len(episodes)
+        return total_reward / len(episodes), total_entropy_reward/len(episodes)
 
     def ntk(self, x1, x2, mode="full", batch=False, softmax=False, show_dim_jac=False):
         """

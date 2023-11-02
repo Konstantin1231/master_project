@@ -96,7 +96,8 @@ def compute_decay(tau_end, tau_init, ngames, patience):
     return (tau_end / tau_init) ** (patience / ngames)
 
 
-def train_agent(agent, env, num_epoches, n_episodes, tau_end=0.2, lr_end=1e-07, patience=100, clip_grad=False):
+def train_agent(agent, env, num_epoches, n_episodes, tau_end=0.2, lr_end=1e-07, patience=100,
+                clip_grad=False):
     """
     :param agent: Agent
     :param env: Environment
@@ -113,8 +114,10 @@ def train_agent(agent, env, num_epoches, n_episodes, tau_end=0.2, lr_end=1e-07, 
     env_reset(env)
     # list to store loss/rewards
     loss_list = []
+    entropy_loss_list = []
     # Train for a number of epochs
-    print(f"beta full = {agent.beta}")
+    print(f" sigma_w = {agent.policy.sigma_w}")
+    print(f" sigma_b = {agent.policy.sigma_b}")
     for epoch in range(num_epoches):
         # Collect episodes
         if agent.name == "MTR":
@@ -122,7 +125,9 @@ def train_agent(agent, env, num_epoches, n_episodes, tau_end=0.2, lr_end=1e-07, 
         else:
             episodes = run_episodes(agent, env, n_episodes=n_episodes)
         # Update the policy based on the episodes
-        loss_list.append(agent.train(episodes, clip_grad=False))
+        loss = agent.train(episodes, clip_grad=clip_grad)
+        loss_list.append(loss[0])
+        entropy_loss_list.append(loss[1])
         if epoch % patience == 0:
             agent.tau = agent.tau * compute_decay(tau_end, agent.tau, num_epoches, patience)
             agent.lr = agent.lr * compute_decay(lr_end, agent.lr, num_epoches, patience)
@@ -131,10 +136,11 @@ def train_agent(agent, env, num_epoches, n_episodes, tau_end=0.2, lr_end=1e-07, 
             print(f"Epoch {epoch + 1}")
             print(f"tau {agent.tau:.3f}")
             print(f"Learning rate {(agent.lr * 1000):.5f} " + "* 10^-3")
-            print(f"Reward: {loss_list[-1]}")
+            print(f"Reward: {loss[0]}")
+            print(f"Entropy Reward: {loss[1]}")
             print()
         env_reset(env)
     agent.lr = lr_init
     agent.tau = tau_init
     close_env(env)
-    return loss_list
+    return loss_list, entropy_loss_list

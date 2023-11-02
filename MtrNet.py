@@ -50,7 +50,7 @@ class MtrNet(nn.Module):
         #     for i in range(n_blocks)
         # })
         self.sigma_b = None
-        self.sigma_2 = None
+        self.sigma_w = None
         if dynamical_layer_param:
             self.blocks = nn.ModuleList(
                 [SimpleBlock(n_inputs, n_actions,
@@ -81,7 +81,7 @@ class MtrNet(nn.Module):
         :param sigma_b: sigma_b * bias
         :return: None
         """
-        self.sigma_2 = sigma_w
+        self.sigma_w = sigma_w
         self.sigma_b = sigma_b
 
         # beta parameter to control chaos order
@@ -261,7 +261,7 @@ class ReinforceMtrNetAgent:
                 for param in self.policy.blocks[block_idx].parameters():
                     param.requires_grad = False
 
-        return total_reward / len(episodes)
+        return total_reward / len(episodes), total_reward / len(episodes)
 
     def ntk(self, x1, x2, step, mode="full", batch=False, softmax=False, show_dim_jac=False):
         """
@@ -319,6 +319,7 @@ class MtrNetAgent:
 
     def train(self, episodes, gamma=0.99, clip_grad=False):
         total_reward = 0
+        total_entropy_reward = 0
         # Disable gradient computation for all parameters
         for param in self.policy.parameters():
             param.requires_grad = False
@@ -338,6 +339,7 @@ class MtrNetAgent:
             # last_state, _, _, _, _ = episode[-1]
             # entropy_rewards[-1] = entropy_rewards[-1] - self.policy.value(torch.FloatTensor(last_state),self.horizen - last_state ,self.tau).detach().numpy()
             C = np.cumsum(entropy_rewards[::-1])
+            total_entropy_reward += C[-1]
             C = torch.FloatTensor(C)
             # Policy gradient update
             for state, step, action, _, _ in episode:
@@ -363,7 +365,7 @@ class MtrNetAgent:
                 for param in self.policy.blocks[block_idx].parameters():
                     param.requires_grad = False
 
-        return total_reward / len(episodes)
+        return total_reward / len(episodes), total_entropy_reward/len(episodes)
 
     def ntk(self, x1, x2, step, mode="full", batch=False, softmax=False, show_dim_jac=False):
         """
@@ -426,6 +428,7 @@ class ShortLongAgent:
 
     def train(self, episodes, gamma=0.99, clip_grad=False):
         total_reward = 0
+        total_entropy_reward = 0
         # Disable gradient computation for all parameters
         for param in self.policy.parameters():
             param.requires_grad = False
@@ -445,6 +448,7 @@ class ShortLongAgent:
             # last_state, _, _, _, _ = episode[-1]
             # entropy_rewards[-1] = entropy_rewards[-1] - self.policy.value(torch.FloatTensor(last_state),self.horizen - last_state ,self.tau).detach().numpy()
             C = np.cumsum(entropy_rewards[::-1])
+            total_entropy_reward += C[-1]
             C = torch.FloatTensor(C)
             # Policy gradient update
             for state, step, action, _, _ in episode:
@@ -458,7 +462,7 @@ class ShortLongAgent:
                 action_probs = self.policy(state_tensor, block_idx, tau=self.tau)
 
                 # Compute the policy gradient loss
-                loss = CustomLoss(C[block_idx])
+                loss = CustomLoss(C[self.horizon - step])
                 self.optimizer.zero_grad()
                 loss(action_probs[0][action]).backward()
 
@@ -470,7 +474,7 @@ class ShortLongAgent:
                 for param in self.policy.blocks[block_idx].parameters():
                     param.requires_grad = False
 
-        return total_reward / len(episodes)
+        return total_reward / len(episodes), total_entropy_reward/len(episodes)
 
     def block_idx(self, horizon_step):
         perc_hor_list = np.array(self.perc_list) * self.horizon

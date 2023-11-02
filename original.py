@@ -40,7 +40,7 @@ class OriginalMTR(nn.Module):
     def __init__(self, n_inputs, n_actions, hidden_dim, n_blocks):
         super(OriginalMTR, self).__init__()
         self.sigma_b = None
-        self.sigma_2 = None
+        self.sigma_w = None
         self.Q = nn.ModuleList([SimpleBlock(n_inputs, n_actions, hidden_dim=hidden_dim) for _ in range(n_blocks)])
         self.softmax = nn.Softmax(dim=-1)
         self.output_size = n_actions
@@ -63,7 +63,7 @@ class OriginalMTR(nn.Module):
         :param sigma_b: sigma_b * bias
         :return: None
         """
-        self.sigma_2 = sigma_w
+        self.sigma_w = sigma_w
         self.sigma_b = sigma_b
         # beta parameter to control chaos order
         def init_weights(m):
@@ -186,10 +186,10 @@ class OriginalMtrAgent:
             self.lr = lr
 
     def select_action(self, state, step):
-        horizen_step = self.horizon - step
+        horizon_step = self.horizon - step
         state_tensor = torch.tensor(state, dtype=torch.float)
         with torch.no_grad():
-            action_prob = self.policy(state_tensor, horizen_step, tau=self.tau)
+            action_prob = self.policy(state_tensor, horizon_step, tau=self.tau)
         action = torch.multinomial(action_prob, 1).item()
         if self.game_name == "Pendulum":
             possible_actions = np.linspace(-2, 2, self.n_action)
@@ -200,6 +200,7 @@ class OriginalMtrAgent:
 
     def train(self, episodes, gamma=0.99, clip_grad=False):
         total_reward = 0
+        total_entopy_reward = 0
         for episode in episodes:
             reward_list = []
             prob_action_list = []
@@ -216,24 +217,25 @@ class OriginalMtrAgent:
             entropy_rewards[-1] = entropy_rewards[-1] - self.policy.value(torch.FloatTensor(last_state), self.horizon - last_step, self.tau).detach().numpy()
             """
             C = np.cumsum(entropy_rewards[::-1])
+            total_entopy_reward += C[-1]
             C = torch.FloatTensor(C)
             # Policy gradient update
             for state, step, action, _, _ in episode:
                 # Enable gradient only for the block related to the current step
-                horizen_step = self.horizon - step
+                horizon_step = self.horizon - step
                 state_tensor = torch.FloatTensor(state).unsqueeze(0)
-                action_probs = self.policy(state_tensor, horizen_step, tau=self.tau)
+                action_probs = self.policy(state_tensor, horizon_step, tau=self.tau)
 
                 # Compute the policy gradient loss
-                loss = CustomLoss(C[horizen_step])
-                self.optimizer[horizen_step].zero_grad()
+                loss = CustomLoss(C[horizon_step])
+                self.optimizer[horizon_step].zero_grad()
                 loss(action_probs[0][action]).backward()
 
                 if clip_grad:
-                    torch.nn.utils.clip_grad_value_(self.policy.Q[horizen_step].parameters(), clip_value=10)
+                    torch.nn.utils.clip_grad_value_(self.policy.Q[horizon_step].parameters(), clip_value=10)
 
-                self.optimizer[horizen_step].step()
-        return total_reward / len(episodes)
+                self.optimizer[horizon_step].step()
+        return total_reward / len(episodes), total_entopy_reward/len(episodes)
 
     def ntk(self, x1, x2, step, mode="full", batch=False, softmax=False, show_dim_jac=False):
         """
