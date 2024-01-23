@@ -56,27 +56,27 @@ To set up this repository on your local machine, follow these steps:
 ## main.ipynb
 Open jupyter notebook main.ipynb.\
 Select the target environment and run cell. In addition, one can choose to set env.random = True to force the random initializing point.\
-![](images/img_1.png)\
+![](images/img_1.png){:width="300px" height="200px"}\
 Next, we set hyperparameters for agents, including learning rate, tau, number of episodes per epoch and number of epochs. By running this cell, we will initialize agents, in other words initialize the Neural Networks, that used to parametrize their policies.\
-![](images/img.png)\
+![](images/img.png){:width="300px" height="200px"}\
 Then, we configure the DataFrame to store results. One can use blank result.csv file for FROM_PATH, and crate new one for TO_PATH = <YOUR PATH>, where all obtained results will be dump in.
-![](images/img_2.png)\
+![](images/img_2.png){:width="300px" height="200px"}\
 Then, one can continue by running the other cells containing training/testing loops for all agents. 
 To visualize results, we use RENDER cell, where the only variable to set: agent - agent we want render and agent.tau = the temperature factor during the game.
-![](images/img_4.png)\
+![](images/img_4.png){:width="300px" height="200px"}\
 
 
 ## Change environment settings
 In order to make more changes, one should explor environment.py file -> game_setup() function.
 Where, one can redefine any proposed constants or add new environment.\
-![](images/img_5.png)\
+![](images/img_5.png){:width="300px" height="200px"}\
 
 One can redefine default rewards using environment.py -> custom_reward() function.
 ![](images/img_6.png)
 
 ## Change Neural Network architecture 
 By default, each Neural Network block parametrized by Feed Forward Relu NN with two hidden layers. One, can modify it changing the .Q attribute in SimpleBlock class for each design (Original in original.py, MtrMet in MtrNet.py, REIN in NeuralNet.py).
-![](images/img_6.png)
+![](images/img_7.png){:width="300px" height="200px"}
 Make sure, to keep consistency with self.output_layer.
 
 
