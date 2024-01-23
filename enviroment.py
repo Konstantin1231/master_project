@@ -95,7 +95,7 @@ def custom_reward(state, reward, terminated, game_name="Lake"):
 
 def game_setup(game_name, render=False):
     """
-    Used to setup environment's hyper-parameters.
+    Used to set up environment's hyperparameters.
     """
     if game_name == "Cart":
         if render == True:

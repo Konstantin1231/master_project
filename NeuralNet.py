@@ -34,18 +34,19 @@ class PolicyNet(nn.Module):
         # Defining a simple neural network with one hidden layer.
         self.sigma_w = None
         self.sigma_b = None
-        self.fc = nn.Sequential(
+        self.Q = nn.Sequential(
             nn.Linear(n_inputs, hidden_dim),  # Input layer
             nn.ReLU(),  # Activation function
             nn.Linear(hidden_dim, hidden_dim),  # hidden layer
             nn.ReLU(),  # Activation function
-            nn.Linear(hidden_dim, n_outputs),  # Output layer
         )
+        self.output_layer = nn.Linear(hidden_dim, n_outputs) # Output layer
         self.output_size = n_outputs
         self.softmax = nn.Softmax(dim=-1)
         self.ntk_init()
     def forward(self, x, tau=1, softmax=True):
-        x = self.fc(x)  # dividing by tau before
+        x = self.Q(x)  # dividing by tau before
+        x = self.output_layer(x)
         # we apply softmax
         if softmax:
             return self.softmax(x / tau)

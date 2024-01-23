@@ -4,12 +4,16 @@
 
 ## Table of Contents
 - [Introduction](#introduction)
-- [Setup](#setup)
+- [Download](#download)
+- 
+- [Quick start](#quick-start)
+- - [main.ipynb](#mainipynb)
+- - [Environment settings](#change-environment-settings)
 - [Results](#results)
 - [To-Do List](#to-do-list)
 - [Update 17.10.2023](#update-17102023)
-- [Update 24-10.2023](#update-24102023)
-- [Update 31.10.2023](#update-31102023)
+-- [Update 24-10.2023](#update-24102023)
+-- [Update 31.10.2023](#update-31102023)
 
 ## Introduction
 
@@ -17,21 +21,20 @@ The Matryoshka Algo repository contains two implementations of the Matryoshka al
 
 1. **Full Connected Neural Network (NN):** In this implementation, we use a fully connected neural network with an extra dimension to encode the step variable. This approach provides quite naive but easy implementation.
 
-2. **Special Case of ResNet NN:** The second implementation leverages a special case of a Residual Neural Network (ResNet) architecture. This choice offers a different perspective on the algorithm's implementation. Which is closer, to the idea of the original algorithm.
+2. **Special Case of ResNet NN, named MtrMet:** The second implementation leverages a special case of a Residual Neural Network (ResNet) architecture. This choice offers a different perspective on the algorithm's implementation. Which is closer, to the idea of the original algorithm or what we refer to as "Shred" Matryoshka design.
 
-In addition to the Matryoshka algorithm implementations, we have also included an implementation of the REINFORCE algorithm for comparison purposes. As a result, you will find two main classes in this repository:
+In addition to the Matryoshka algorithm implementations, we have also included an implementation of the REINFORCE algorithm for comparison purposes. As a result, you will find following classes (Agents) in this repository:
 
-- `ReinforceAgent`: This class represents the implementation of the REINFORCE algorithm.
-- `MTRAgent`: This class represents the Matryoshka algorithm implementations, allowing you to explore and compare the two different approaches.
-
-
-
-
+- `ReinforceAgent (REIN)`: This class represents the implementation of the REINFORCE algorithm.
+- `MTRAgent (MTR)`: Similar to ReinforceAgent, with extra dimension for input, that used to encode the step horizon and entropy regularized reward.
+- `OriginalMtrAgent (Original)`: Parametrization consist of a number of independed blocks, each representing NN with entropy regularization. Each block, encode policy of specific horizon step.
+- `OriginalMtrAgent (Original)`:
 
 
 
 
-## Setup
+
+## Download
 
 To set up this repository on your local machine, follow these steps:
 
@@ -48,60 +51,33 @@ To set up this repository on your local machine, follow these steps:
    venv\Scripts\activate
    pip install -r requirements.txt
    
-## Features
-
-### Change game environment 
-One might select one of the proposed games:
-![](images/environment.png)
-
-In order to make more changes, one should explor enviroment.py file -> game_setup() function.
-Where, one can redefine any proposed constants or add new environment. 
-
-![](images/game_setup.png)
-
-### Change game rewards
-One can redefine default rewards using envoroment.py -> custom_reward() function.
-![](images/custom_reward.png)
-
-## Results
-
-- MTR  - Feed Forward with extra dimension (for step horizon) and Max-entropy reward
-- REIN - Feed Forward. Reinforce algorithm 
-- MTRNet - Matryoshka Net with Max-entropy reward
-- ReinMTRNet - Matryoshka Net
-
-### Cart-Pole Game
-The Cart-Pole game is a classic reinforcement learning environment where the goal is to balance a pole on a moving cart. The agent must make decisions to keep the pole balanced for as long as possible. The result shows the performance of our Matryoshka algorithm on the Cart-Pole task.
-
-![](images/Cart_1.jpg)
-![](images/Cart_4.jpg)
-
-We see that ntk parametrization, that have Beta scalar variable to control chaos order has a significant impact on the training.
-
-### Frozen Lake Game
-Frozen Lake is another reinforcement learning environment where the agent navigates a grid world to reach a goal while avoiding holes in the ice. The result showcases how our algorithm performs in this challenging environment.
-
-![](images/Lake.jpg)
-![](images/Lake_1.jpg)
-
-### Maze Game
-The Maze game involves navigating through a complex maze to reach the goal. It's a test of the algorithm's ability to handle more intricate environments. This result demonstrates our algorithm's performance in solving mazes.
-
-![](images/Maze.jpg)
-
-### Toy Environment
-The Toy Environment is a simple game described in our work ( https://arxiv.org/pdf/2303.12785.pdf , page 26) and serves as a numerical support for theoretical findings. It provides valuable insights into the behavior of our Matryoshka algorithm in a controlled environment.
-
-![](images/Toy_1.jpg)
+# Quick start
+ 
+## main.ipynb
+Open jupyter notebook main.ipynb.\
+Select the target environment and run cell. In addition, one can choose to set env.random = True to force the random initializing point.\
+![](images/img_1.png)\
+Next, we set hyperparameters for agents, including learning rate, tau, number of episodes per epoch and number of epochs. By running this cell, we will initialize agents, in other words initialize the Neural Networks, that used to parametrize their policies.\
+![](images/img.png)\
+Then, we configure the DataFrame to store results. One can use blank result.csv file for FROM_PATH, and crate new one for TO_PATH = <YOUR PATH>, where all obtained results will be dump in.
+![](images/img_2.png)\
+Then, one can continue by running the other cells containing training/testing loops for all agents. 
+To visualize results, we use RENDER cell, where the only variable to set: agent - agent we want render and agent.tau = the temperature factor during the game.
+![](images/img_4.png)\
 
 
-## To-Do List
+## Change environment settings
+In order to make more changes, one should explor environment.py file -> game_setup() function.
+Where, one can redefine any proposed constants or add new environment.\
+![](images/img_5.png)\
 
-Here are the upcoming features and improvements planned for the Matryoshka Algo project:
+One can redefine default rewards using environment.py -> custom_reward() function.
+![](images/img_6.png)
 
-1. Toy example: code method to calculate q_n_star
-
-2. EOC(edge of chaos) estimation. 
+## Change Neural Network architecture 
+By default, each Neural Network block parametrized by Feed Forward Relu NN with two hidden layers. One, can modify it changing the .Q attribute in SimpleBlock class for each design (Original in original.py, MtrMet in MtrNet.py, REIN in NeuralNet.py).
+![](images/img_6.png)
+Make sure, to keep consistency with self.output_layer.
 
 
 
