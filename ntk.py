@@ -1,5 +1,5 @@
 """
-Code was taking from the pytorch "ntk" tutorial. Repository link : https://github.com/pytorch/tutorials/blob/main/intermediate_source/neural_tangent_kernels.py
+The core of NTK realization was taking from the pytorch "ntk" tutorial. Repository link : https://github.com/pytorch/tutorials/blob/main/intermediate_source/neural_tangent_kernels.py
 """
 import torch
 from torch.func import functional_call, vmap, vjp, jvp, jacrev
@@ -32,7 +32,7 @@ def empirical_ntk_jacobian_contraction(fnet_single, params, x1, x2, compute='ful
 
     result = torch.stack([torch.einsum(einsum_expr, j1, j2) for j1, j2 in zip(jac1, jac2)])
     result = result.sum(0)
-    return [result[:, 0], jac1]
+    return [result[:, 0].detach().numpy()[0], jac1]
 
 def empirical_ntk_ntk_vps(func, params, x1, x2, compute='full'):
     def get_ntk(x1, x2):

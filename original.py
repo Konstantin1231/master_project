@@ -23,20 +23,42 @@ class CustomLoss(nn.Module):
 
 
 class SimpleBlock(nn.Module):
+    """
+    Construction of individual blocks
+    """
     def __init__(self, n_inputs, n_outputs, hidden_dim=8):
         super(SimpleBlock, self).__init__()
         self.Q = nn.Sequential(
             nn.Linear(n_inputs, hidden_dim),  # Input layer
             nn.ReLU(),  # Activation function
-            nn.Linear(hidden_dim, n_outputs),  # Output layer
+            nn.Linear(hidden_dim, hidden_dim),  # hidden layer
+            nn.ReLU(),  # Activation function
         )
-
-    def forward(self, x, prev_output=None):
+        self.output_layer = nn.Linear(hidden_dim, n_outputs)  # Output layer
+    def forward(self, x):
         out = self.Q(x)
+        out = self.output_layer(out)
         return out
+
+    def conjugate_kernel(self, x1, x2):
+        """
+        Conjugate Kernel
+        :param x1: input
+        :param x2: input
+        :return: torch scalar (conjugate_kernel)
+        """
+        with torch.no_grad():
+            a_x1 = self.Q(x1)
+            a_x2 = self.Q(x2)
+        # Compute the dot product (Conjugate Kernel)
+        ck = torch.dot(a_x1.flatten(), a_x2.flatten())
+        return ck.numpy()
 
 
 class OriginalMTR(nn.Module):
+    """
+    Original Neural Network Constraction
+    """
     def __init__(self, n_inputs, n_actions, hidden_dim, n_blocks):
         super(OriginalMTR, self).__init__()
         self.sigma_b = None
@@ -67,6 +89,7 @@ class OriginalMTR(nn.Module):
         self.sigma_b = sigma_b
         # beta parameter to control chaos order
         def init_weights(m):
+
             if isinstance(m, nn.Linear):
                 # Initialize weights as standard Gaussian RVs
                 nn.init.normal_(m.weight, mean=0, std=1)
@@ -83,11 +106,24 @@ class OriginalMTR(nn.Module):
     def value(self, x, horizen_step, tau):
         return tau * torch.log((torch.exp(self.forward(x, horizen_step, tau, softmax=False) / tau).sum() / self.output_size))
 
+    def conjugate_kernel(self, x1, x2, block_idx):
+        """
+        Conjugate kernel by blocks
+        :param block_idx: idx of the block, we want to extract features
+        block_idx is similar to the horizon step = horizon - step, belong to the interval [0,1,2 ... n-1]
+        :return: Conjugate kernel
+        """
+        x1 = torch.tensor(x1, dtype=torch.float)
+        x2 = torch.tensor(x2, dtype=torch.float)
+        selected_block = self.Q[block_idx]
+        return selected_block.conjugate_kernel(x1,x2)
+
     def ntk(self, x1, x2, block_idx, tau=1, mode="full", softmax=False, show_dim_jac=False):
         """
         Neural Tangent Kernel (NEW version)
         :param mode: either "trace" or "full"
         :param x1, x2: Should have batch dimension
+        :return: [ntk (ndarray), Jacobian (list(torch))]
         """
 
         # params = {k: v.detach() for k, v in self.named_parameters()}
@@ -165,6 +201,9 @@ class OriginalMTR(nn.Module):
 
 
 class OriginalMtrAgent:
+    """
+    Original Agent
+    """
     def __init__(self, n_inputs, n_outputs, hidden_dim, horizon, game_name, tau=1, learning_rate=1e-3):
         self.horizon = horizon
         self.policy = OriginalMTR(n_inputs, n_outputs, hidden_dim, horizon)

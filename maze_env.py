@@ -1,16 +1,21 @@
 import gym
 from gym import spaces
 import numpy as np
-
+import random
 
 class CustomMazeEnv(gym.Env):
-    def __init__(self, maze_size=5, reward_pos=(4, 4), wall_pose = (2,2), reward = 20, one_hot_coded=False):
+    """
+    Maze environment
+    """
+    def __init__(self, maze_size=5, reward_pos=(4, 4), wall_pose = (2,2), reward=20, one_hot_coded=True):
         super(CustomMazeEnv, self).__init__()
 
         # Define the maze dimensions (e.g., 5x5 grid)
+        self.n_actions = 4
         self.grid_size = maze_size
         self.reward_pose = reward_pos
         self.reward  = reward
+        self.wall_pose = wall_pose
         self.observation_space = spaces.Discrete(self.grid_size * self.grid_size)
 
         # Define action space (up, down, left, right)
@@ -54,8 +59,11 @@ class CustomMazeEnv(gym.Env):
             return list(self.agent_position), reward, done, {}, {}
 
     def reset(self):
-        # Reset the agent's position to the starting point
-        self.agent_position = [0, 0]
+        # Reset the agent's position to the starting point.
+        # We do it random, between three starting points
+        starting_points = [[0,0], [self.grid_size-1,0], [0,self.grid_size-1]]
+        self.agent_position = random.choices(starting_points)[0]
+
         if self.one_hot_coded:
             return np.eye(self.grid_size**2)[self.agent_position[1]*self.grid_size + self.agent_position[0], :], {}
         else:
@@ -67,7 +75,7 @@ class CustomMazeEnv(gym.Env):
             for col in range(self.grid_size):
                 if (row, col) == self.agent_position:
                     print("A", end=" ")  # Agent
-                elif (row, col) == (4, 4):
+                elif (row, col) == self.wall_pose:
                     print("G", end=" ")  # Goal
                 elif self.maze[row, col] == 1:
                     print("#", end=" ")  # Wall

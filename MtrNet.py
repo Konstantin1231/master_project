@@ -6,11 +6,10 @@ from ntk import empirical_ntk_ntk_vps, empirical_ntk_jacobian_contraction
 from torch.func import functional_call
 import copy
 import pickle
-from NeuralNet import PolicyNet
+
 
 class CustomLoss(nn.Module):
     """ to simplify the gradient computation and applying log to the output of the  network"""
-
     def __init__(self, C):
         super().__init__()
         self.C = C
@@ -28,29 +27,40 @@ class SimpleBlock(nn.Module):
         self.Q = nn.Sequential(
             nn.Linear(n_inputs, hidden_dim),  # Input layer
             nn.ReLU(),  # Activation function
-            nn.Linear(hidden_dim, n_outputs),  # Output layer
+            nn.Linear(hidden_dim, hidden_dim),  #  # hidden layer
+            nn.ReLU(),  # Activation function
         )
+        self.output_layer = nn.Linear(hidden_dim, n_outputs) # Output layer
 
     def forward(self, x, prev_output=None):
         out = self.Q(x)
+        out = self.output_layer(out)
         if prev_output is not None:
             out += prev_output
         return out
-
-
-
+    def conjugate_kernel(self, x1, x2):
+        """
+        Conjugate Kernel
+        :param x1: input
+        :param x2: input
+        :return: torch scalar (conjugate_kernel)
+        """
+        with torch.no_grad():
+            a_x1 = self.Q(x1)
+            a_x2 = self.Q(x2)
+        # Compute the dot product (Conjugate Kernel)
+        ck = torch.dot(a_x1.flatten(), a_x2.flatten())
+        return ck.numpy()
 
 class MtrNet(nn.Module):
+    """
+    MtrNet Neural Network
+    """
     def __init__(self, n_inputs, n_actions, hidden_dim, n_blocks, dynamical_layer_param=False):
         super(MtrNet, self).__init__()
-        # Using _modules to set the block with a particular name
-        # Create an OrderedDict to hold the blocks
-        # self.blocks = nn.ModuleDict({
-        #      f'block_{i+1}': SimpleBlock(n_inputs, n_actions, hidden_dim=hidden_dim)
-        #     for i in range(n_blocks)
-        # })
         self.sigma_b = None
         self.sigma_w = None
+        # dynamical layers
         if dynamical_layer_param:
             self.blocks = nn.ModuleList(
                 [SimpleBlock(n_inputs, n_actions,
@@ -63,10 +73,9 @@ class MtrNet(nn.Module):
         self.output_size = n_actions
         self.ntk_init()
 
-    def forward(self, x, horizen_step, tau=1, softmax=True):
+    def forward(self, x, horizon_step, tau=1, softmax=True):
         prev_output = None
-        for block in self.blocks[:horizen_step + 1]:
-            # print([name for name, param in self.blocks[:horizen_step+1].named_parameters()])
+        for block in self.blocks[:horizon_step + 1]:
             prev_output = block(x, prev_output)  # passing the original input and the output from the previous block
         if softmax:
             return self.softmax(prev_output / tau)
@@ -103,12 +112,26 @@ class MtrNet(nn.Module):
         return tau * torch.log(
             (torch.exp(self.forward(x, horizen_step, tau, softmax=False) / tau).sum() / self.output_size))
 
+    def conjugate_kernel(self, x1, x2, block_idx):
+        """
+        Conjugate kernel by blocks
+        :param block_idx: idx of the block, we want to extract features
+        block_idx is similar to the horizon step = horizon - step, belong to the interval [0,1,2 ... n-1]
+        :return: Conjugate kernel
+        """
+        x1 = torch.tensor(x1, dtype=torch.float)
+        x2 = torch.tensor(x2, dtype=torch.float)
+        selected_block = self.blocks[block_idx]
+        return selected_block.conjugate_kernel(x1,x2)
+
+
     def ntk(self, x1, x2, block_idx, tau, mode="full", softmax=False, show_dim_jac=False):
         """
         Neural Tangent Kernel
         :param softmax: True if we want to apply softmax ob the output(preferences)
         :param mode: either "trace" or "full"
         :param x1, x2: Should have batch dimension
+        :return: [ntk (ndarray), Jacobian (list(torch))]
         """
         params = {}
         for name, param in self.named_parameters():
@@ -185,8 +208,9 @@ class MtrNet(nn.Module):
 
 
 class ReinforceMtrNetAgent:
+    """ REIN MtrNet Agent"""
     def __init__(self, n_inputs, n_outputs, hidden_dim, horizon, game_name, tau=1, learning_rate=1e-3,
-                 dynamical_layer_param=False):
+                 dynamical_layer_param=False, lightMTR=True ):
         self.horizon = horizon
         self.policy = MtrNet(n_inputs, n_outputs, hidden_dim, horizon, dynamical_layer_param=dynamical_layer_param)
         self.optimizer = optim.Adam(self.policy.parameters(), lr=learning_rate)
@@ -198,7 +222,8 @@ class ReinforceMtrNetAgent:
         self.horizon = horizon
         self.game_name = game_name
         self.name = "ReinMtrNet"
-
+        self.lightMTR=lightMTR
+        self.dynamical = dynamical_layer_param
     def set_optimazer(self, lr=None):
         if lr == None:
             self.optimizer = optim.Adam(self.policy.parameters(), lr=self.lr)
@@ -239,11 +264,15 @@ class ReinforceMtrNetAgent:
             for state, step, action, _, _ in episode:
 
                 block_idx = self.horizon - step
-                # Disable gradient for all blocks
 
-                # Enable gradient only for the block related to the current step
-                for param in self.policy.blocks[block_idx].parameters():
-                    param.requires_grad = True
+                if not self.lightMTR:
+                    # Enable gradient only for the block related to the current step
+                    for param in self.policy.blocks[:block_idx+1].parameters():
+                        param.requires_grad = True
+                else:
+                    # Enable gradient only for the block related to the current step
+                    for param in self.policy.blocks[block_idx].parameters():
+                        param.requires_grad = True
 
                 state_tensor = torch.FloatTensor(state).unsqueeze(0)
                 action_probs = self.policy(state_tensor, block_idx, tau=self.tau)
@@ -254,12 +283,18 @@ class ReinforceMtrNetAgent:
                 loss.backward()
 
                 if clip_grad:
-                    torch.nn.utils.clip_grad_value_(self.policy.parameters(), clip_value=10)
+                    torch.nn.utils.clip_grad_value_(self.policy.parameters(), clip_value=8)
 
                 self.optimizer.step()
 
-                for param in self.policy.blocks[block_idx].parameters():
-                    param.requires_grad = False
+                if not self.lightMTR:
+                    # Enable gradient only for the block related to the current step
+                    for param in self.policy.blocks[:block_idx+1].parameters():
+                        param.requires_grad = False
+                else:
+                    # Enable gradient only for the block related to the current step
+                    for param in self.policy.blocks[block_idx].parameters():
+                        param.requires_grad = False
 
         return total_reward / len(episodes), total_reward / len(episodes)
 
@@ -283,11 +318,13 @@ class ReinforceMtrNetAgent:
                                show_dim_jac=show_dim_jac)
 
 
+
 class MtrNetAgent:
+    """MtrNet Agent"""
     def __init__(self, n_inputs, n_outputs, hidden_dim, horizon, game_name, tau=1, learning_rate=1e-3,
-                 dynamical_layer_param=False):
+                 dynamical_layer_param=False, lightMTR=True):
         self.policy = MtrNet(n_inputs, n_outputs, hidden_dim, horizon, dynamical_layer_param=dynamical_layer_param)
-        self.optimizer = optim.Adam(self.policy.parameters(), lr=learning_rate)
+        self.optimizer = optim.SGD(self.policy.parameters(), lr=learning_rate)
         self.ObsSpaceDim = n_inputs
         self.n_action = n_outputs
         self.tau = tau
@@ -296,12 +333,14 @@ class MtrNetAgent:
         self.horizon = horizon
         self.game_name = game_name
         self.name = "MtrNet"
+        self.lightMTR = lightMTR
+        self.dynamical = dynamical_layer_param
 
     def set_optimazer(self, lr=None):
         if lr == None:
-            self.optimizer = optim.Adam(self.policy.parameters(), lr=self.lr)
+            self.optimizer = optim.SGD(self.policy.parameters(), lr=self.lr)
         else:
-            self.optimizer = optim.Adam(self.policy.parameters(), lr=lr)
+            self.optimizer = optim.SGD(self.policy.parameters(), lr=lr)
             self.lr = lr
 
     def select_action(self, state, step):
@@ -320,10 +359,8 @@ class MtrNetAgent:
     def train(self, episodes, gamma=0.99, clip_grad=False):
         total_reward = 0
         total_entropy_reward = 0
-        # Disable gradient computation for all parameters
-        for param in self.policy.parameters():
-            param.requires_grad = False
 
+        self.optimizer.zero_grad()
         for episode in episodes:
             reward_list = []
             prob_action_list = []
@@ -341,29 +378,50 @@ class MtrNetAgent:
             C = np.cumsum(entropy_rewards[::-1])
             total_entropy_reward += C[-1]
             C = torch.FloatTensor(C)
-            # Policy gradient update
+
+
+
+            # Disable gradient computation for all parameters
+            for param in self.policy.parameters():
+                param.requires_grad = False
+
             for state, step, action, _, _ in episode:
+
                 block_idx = self.horizon - step
+
+                """if not self.lightMTR:
+                    # Enable gradient only for the block related to the current step
+                    for param in self.policy.blocks[:block_idx+1].parameters():
+                        param.requires_grad = True"""
 
                 # Enable gradient only for the block related to the current step
                 for param in self.policy.blocks[block_idx].parameters():
-                    param.requires_grad = True
+                        param.requires_grad = True
 
                 state_tensor = torch.FloatTensor(state).unsqueeze(0)
                 action_probs = self.policy(state_tensor, block_idx, tau=self.tau)
 
                 # Compute the policy gradient loss
                 loss = CustomLoss(C[block_idx])
-                self.optimizer.zero_grad()
+
                 loss(action_probs[0][action]).backward()
 
                 if clip_grad:
                     torch.nn.utils.clip_grad_value_(self.policy.parameters(), clip_value=10)
 
-                self.optimizer.step()
 
-                for param in self.policy.blocks[block_idx].parameters():
-                    param.requires_grad = False
+                if self.lightMTR:
+                    self.optimizer.step()
+                    self.optimizer.zero_grad()
+                    # Enable gradient only for the block related to the current step
+                    for param in self.policy.blocks[block_idx].parameters():
+                        param.requires_grad = False
+                    """# Enable gradient only for the block related to the current step
+                    for param in self.policy.blocks[:block_idx+1].parameters():
+                        param.requires_grad = False"""
+
+        if not self.lightMTR:
+                self.optimizer.step()
 
         return total_reward / len(episodes), total_entropy_reward/len(episodes)
 
@@ -388,8 +446,11 @@ class MtrNetAgent:
 
 
 class ShortLongAgent:
+    """
+    Short-Long Net Agent
+    """
     def __init__(self, n_inputs, n_outputs, hidden_dim, horizon, game_name, perc_list=None, tau=1, learning_rate=1e-3,
-                 dynamical_layer_param=False):
+                 dynamical_layer_param=False, lightMTR=True):
         self.horizon = horizon
         if perc_list == None:
             self.perc_list = [0.03, 0.06, 0.1, 0.16, 0.26, 0.38, 0.5, 0.65, 0.8]
@@ -397,7 +458,7 @@ class ShortLongAgent:
             self.perc_list = perc_list
         self.n_blocs = len(self.perc_list) + 1
         self.policy = MtrNet(n_inputs, n_outputs, hidden_dim, self.n_blocs, dynamical_layer_param=dynamical_layer_param)
-        self.optimizer = optim.Adam(self.policy.parameters(), lr=learning_rate)
+        self.optimizer = optim.SGD(self.policy.parameters(), lr=learning_rate)
         self.ObsSpaceDim = n_inputs
         self.n_action = n_outputs
         self.tau = tau
@@ -405,12 +466,14 @@ class ShortLongAgent:
         self.lr = learning_rate
         self.game_name = game_name
         self.name = "ShortLongNet"
+        self.lightMTR = lightMTR
+        self.dynamical = dynamical_layer_param
 
     def set_optimazer(self, lr=None):
         if lr == None:
-            self.optimizer = optim.Adam(self.policy.parameters(), lr=self.lr)
+            self.optimizer = optim.SGD(self.policy.parameters(), lr=self.lr)
         else:
-            self.optimizer = optim.Adam(self.policy.parameters(), lr=lr)
+            self.optimizer = optim.SGD(self.policy.parameters(), lr=lr)
             self.lr = lr
 
     def select_action(self, state, step):
@@ -454,9 +517,13 @@ class ShortLongAgent:
             for state, step, action, _, _ in episode:
                 block_idx = self.block_idx(self.horizon - step)
 
-                # Enable gradient only for the block related to the current step
-                for param in self.policy.blocks[block_idx].parameters():
-                    param.requires_grad = True
+                if not self.lightMTR:
+                    # Enable gradient only for the block related to the current step
+                    for param in self.policy.blocks[:block_idx+1].parameters():
+                        param.requires_grad = True
+                else:
+                    for param in self.policy.blocks[block_idx].parameters():
+                        param.requires_grad = True
 
                 state_tensor = torch.FloatTensor(state).unsqueeze(0)
                 action_probs = self.policy(state_tensor, block_idx, tau=self.tau)
@@ -471,8 +538,14 @@ class ShortLongAgent:
 
                 self.optimizer.step()
 
-                for param in self.policy.blocks[block_idx].parameters():
-                    param.requires_grad = False
+                if not self.lightMTR:
+                    # Enable gradient only for the block related to the current step
+                    for param in self.policy.blocks[:block_idx+1].parameters():
+                        param.requires_grad = False
+                else:
+                    # Enable gradient only for the block related to the current step
+                    for param in self.policy.blocks[block_idx].parameters():
+                        param.requires_grad = False
 
         return total_reward / len(episodes), total_entropy_reward/len(episodes)
 

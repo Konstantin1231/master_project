@@ -8,7 +8,7 @@ from ntk import empirical_ntk_ntk_vps, empirical_ntk_jacobian_contraction
 from torch.func import functional_call
 
 
-# Adding Cunstom loss, to ensure that optimizer works correctly
+# Adding Custom loss, to ensure that optimizer works correctly
 class CustomLoss(nn.Module):
     """ to simplify the gradient computation and applying log to the output of the  network"""
 
@@ -23,9 +23,12 @@ class CustomLoss(nn.Module):
         return -torch.sum(torch.log(outputs) * self.C)
 
 
-# Step 2: Define the policy model.
+
 # A neural network which, given a state, outputs a probability distribution over actions.
 class PolicyNet(nn.Module):
+    """
+    Neural Network
+    """
     def __init__(self, n_inputs = 1, n_outputs= 1, hidden_dim= 2):
         super(PolicyNet, self).__init__()
         # Defining a simple neural network with one hidden layer.
@@ -33,6 +36,8 @@ class PolicyNet(nn.Module):
         self.sigma_b = None
         self.fc = nn.Sequential(
             nn.Linear(n_inputs, hidden_dim),  # Input layer
+            nn.ReLU(),  # Activation function
+            nn.Linear(hidden_dim, hidden_dim),  # hidden layer
             nn.ReLU(),  # Activation function
             nn.Linear(hidden_dim, n_outputs),  # Output layer
         )
@@ -153,9 +158,12 @@ class PolicyNet(nn.Module):
 
 
 class ReinforceAgent:
+    """
+    REIN Agent
+    """
     def __init__(self, n_inputs, n_outputs, hidden_dim, game_name, horizon=100000, learning_rate=1e-3, tau=1):
         self.policy = PolicyNet(n_inputs, n_outputs, hidden_dim)
-        self.optimizer = optim.Adam(self.policy.parameters(), lr=learning_rate)
+        self.optimizer = optim.SGD(self.policy.parameters(), lr=learning_rate)
         self.ObsSpaceDim = n_inputs
         self.n_action = n_outputs
         self.beta = self.policy.sigma_b
@@ -167,9 +175,9 @@ class ReinforceAgent:
 
     def set_optimazer(self, lr=None):
         if lr == None:
-            self.optimizer = optim.Adam(self.policy.parameters(), lr=self.lr)
+            self.optimizer = optim.SGD(self.policy.parameters(), lr=self.lr)
         else:
-            self.optimizer = optim.Adam(self.policy.parameters(), lr=lr)
+            self.optimizer = optim.SGD(self.policy.parameters(), lr=lr)
             self.lr = lr
 
     def select_action(self, state):
@@ -234,9 +242,12 @@ class ReinforceAgent:
 
 
 class MTRAgent:
+    """
+    MTR Agent
+    """
     def __init__(self, n_inputs, n_outputs, hidden_dim, horizon, game_name, tau=1, learning_rate=1e-3):
         self.policy = PolicyNet(n_inputs + 1, n_outputs, hidden_dim)
-        self.optimizer = optim.Adam(self.policy.parameters(), lr=learning_rate)
+        self.optimizer = optim.SGD(self.policy.parameters(), lr=learning_rate)
         self.ObsSpaceDim = n_inputs
         self.n_action = n_outputs
         self.horizon = horizon
@@ -248,9 +259,9 @@ class MTRAgent:
 
     def set_optimazer(self, lr=None):
         if lr == None:
-            self.optimizer = optim.Adam(self.policy.parameters(), lr=self.lr)
+            self.optimizer = optim.SGD(self.policy.parameters(), lr=self.lr)
         else:
-            self.optimizer = optim.Adam(self.policy.parameters(), lr=lr)
+            self.optimizer = optim.SGD(self.policy.parameters(), lr=lr)
             self.lr = lr
     def select_action(self, input_vector):
         input_vector_tensor = torch.tensor(input_vector, dtype=torch.float)
@@ -284,9 +295,12 @@ class MTRAgent:
             # Corresponds to the MPG update step and C_i computation in Algorithm 1
             entropy_rewards = np.array(reward_list) - self.tau * np.log(
                 self.policy.output_size * np.array(prob_action_list))
+
             # Centre rewards by subtraction of the value function
             # last_state, _, _, _, _ = episode[-1]
             # entropy_rewards[-1] = entropy_rewards[-1] - self.policy.value(torch.FloatTensor(last_state), self.tau).detach().numpy()
+
+
             C = np.cumsum(entropy_rewards)
             total_entropy_reward += C[-1]
             # Convert C to a float tensor for PyTorch calculations
