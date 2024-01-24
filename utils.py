@@ -254,6 +254,9 @@ def unif_measure(pi1, pi2):
 
 
 class Ntk_analysis:
+    """
+        NTK/CK ANALYSIS
+    """
     def __init__(self, env):
         self.env = env
         self.rank = {}
@@ -267,9 +270,6 @@ class Ntk_analysis:
         self.pi_eval = {}
         self.m = {}
 
-    """
-      NTK/CK ANALYSIS
-      """
 
     def ntk_matrix(self, Agent, idx_block):
         """

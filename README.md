@@ -10,8 +10,9 @@
 - [Quick start](#quick-start)
 - - [main.ipynb](#mainipynb)
 - - [Environment settings](#change-environment-settings)
-- [Results](#results)
-- [To-Do List](#to-do-list)
+- - [Neural Network architecture](#change-neural-network-architecture)
+- [Agents](#agents)
+- [Environments](#environments)
 - [Update 17.10.2023](#update-17102023)
 -- [Update 24-10.2023](#update-24102023)
 -- [Update 31.10.2023](#update-31102023)
@@ -34,19 +35,22 @@ In addition to the Matryoshka algorithm implementations, we have also included a
 
 ## File Structure
 
-| File/Folder Name | Description |
-| ---------------- | ----------- |
-| `main.py`        | Main script for initiating the training process. |
-| `/models`        | Contains the neural network models used in the policy gradient updates. |
-| `/environments`  | Includes the environments simulated for reinforcement learning tasks. |
-| `/agents`        | Code for the different reinforcement learning agents. |
-| `/utils`         | Utility scripts for tasks like data processing, logging, etc. |
-| `/tests`         | Unit tests to validate the functionality of the code. |
-| `requirements.txt` | Lists all the Python dependencies required for the project. |
-| `/docs`          | Additional documentation and resources. |
-| `README.md`      | This file, containing an overview and guide to the repository. |
-
-
+| File/Folder Name     | Description                                                                                                                                                                                                                                                                           |
+|----------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `main.ipynb`         | Main script for initiating analysis.                                                                                                                                                                                                                                                  |
+| `NeuralNet.py`       | Contains the neural network model class PolicyNet and two Agent's classes that use this NN: ReinforceAgent and MTRAgent.                                                                                                                                                              |
+| `original.py`        | Contains the neural network model class OriginalMTR and  Agent's class that uses this NN: ReinforceAgent and OriginalMtrAgent.                                                                                                                                                        |
+| `MtrNet.py`          | Contains the neural network model class MtrNet and Agent's classes that use this NN: ReinforceMtrNetAgent, MtrNetAgent and ShortLongAgent .                                                                                                                                           |
+| `enviroment.py`      | Stores essential functionality to smoothly run different game's environments.                                                                                                                                                                                                         |
+| `utils.py`           | Stores essential functionality to run training/testing loops. In addition, contains the Ntk_analysis class, that used to provide tools for spectral decomposition of NTK and CK kernels, estimate state distribution and estimate optimal projection on the effective rank of the CK. |
+| `requirements.txt`   | Lists all the Python dependencies required for the project.                                                                                                                                                                                                                           |
+| `/documents`         | Additional documentation and resources.                                                                                                                                                                                                                                               |
+| `/images`            | Saved plots and figure, produced for the master's thesis.                                                                                                                                                                                                                             |
+| `/results`           | Folder containing .csv files, recorder during experimental phase for master's thesis.                                                                                                                                                                                                 |
+| `toy.py/maze.py`     | Custom made environments.                                                                                                                                                                                                                                                             |
+| `ntk.py`             | Neural Target Kernel realizations. (Based on the work ["Fast Finite Width Neural Tangent Kernel"](./documents/fast_finite_width_NTK.pdf))                                                                                                                                             |
+| `result_stats.ipynb` | Jupyter notebook to visualize results from the folder ./results.                                                                                                                                                                                                                      |
+| `README.md`          | This file, containing an overview and guide to the repository.                                                                                                                                                                                                                        |
 
 ## Download
 
@@ -106,10 +110,110 @@ Make sure, to keep consistency with self.output_layer.
 
 
 
-# Agents  
+# Agents
+
+### Description of Agent Classes
+
+Files: NeuralNet.py, original.py and MtrNet.py.
+
+The Agent's classes in this project are designed to implement the following four algorithms:
+
+1. **REIN (Class name: ReinforceAgent)**: Implements the standard REINFORCE algorithm with an \(\epsilon\)-greedy policy. This serves as a benchmark algorithm, representing stationary policies without the concept of step horizon.
+
+2. **MTR (Class name: MTRAgent)**: Similar to REIN, MTR employs a singular policy but introduces an extra input dimension to incorporate current horizon step information into the policy network. This algorithm adapts to step horizon dynamics and can be viewed as an initial realization of the Matryoshka algorithm.
+
+3. **Original (Class name: OriginalMtrAgent)**: A direct implementation of the Matryoshka principle, using a set of independent Neural Networks for each step horizon.
+
+4. **MtrNet (Class name: MtrNetAgent)**: A novel implementation of the Matryoshka principle, utilizing shared parametrization with the S-MPG update.
+
+All of these classes exhibit the same methods, which are outlined below.
+
+### Agent class methods
+
+| Method Name                 | Description |
+| --------------------------- | ----------- |
+| `__init__`                  | Initializes the agent with specified inputs, outputs, dimensions, horizon, game name, learning rate, and policy. |
+| `set_optimizer`             | Sets or updates the learning rate for the optimizer. |
+| `select_action`             | Selects an action based on the current state and step, using the policy. |
+| `train`                     | Trains the agent over a specified number of episodes, updating the policy using gradient descent. |
+| `ntk`                       | Computes the Neural Tangent Kernel (NTK) for given inputs and game steps. |
+
+### Policy Network methods (Accessed through AgentClass.policy)
+
+| Method Name                 | Description |
+| --------------------------- | ----------- |
+| `__init__`                  | Initializes the Original Neural Network Construction with specified inputs, outputs, hidden dimensions, and blocks. |
+| `forward`                   | Forward pass for the neural network based on the input and horizon step. |
+| `ntk_init`                  | Initializes weights of the neural network according to a specific scheme. |
+| `value`                     | Computes the value function for a given input and horizon step. |
+| `conjugate_kernel`          | Computes the conjugate kernel for specified inputs and a block index. |
+| `ntk`                       | Computes the Neural Tangent Kernel (NTK) for given inputs, block index, and other parameters. |
+| `count_parameters_in_block` | Counts the total number of parameters in a specified block of the neural network. |
+| `total_number_parameters`   | Calculates the total number of parameters in the neural network. |
+| `save_parameters`           | Saves the model parameters to a specified file path. |
+| `load_parameters`           | Loads model parameters from a specified file path. |
+| `norm_param`                | Prints the norm of parameters per layer in the neural network. |
+| `rescale_weights`           | Rescales weights of the neural network. |
+| `store_weights`             | Stores the current state of the neural network weights. |
+| `compute_change_in_weights` | Computes the change in weights compared to a given old weight state. |
+| `restore_weights`           | Restores weights of the neural network to a previously stored state. |
+
+These methods provide a comprehensive set of functionalities for implementing and experimenting with the specified reinforcement learning algorithms in the context of policy gradient updates.
+
+### MtrNet 
+This class, have two additional attributes: 
+- .LightMTR = (default) True. Enable Light MPG update instead of S-MPG one. (See more in Section 2.2 "Light MPG" in ["Neural Horizons: Exploring Matryoshka Policy Gradients"](./documents/Master_project_Medyanikov.pdf)).
+- .dynamical = (default) False. Set decreasing order for the number of trainable, w.r.t step horizon. 
 
 
+# Environments
 
+To test Agent's performance we adapted four different environments (see below). Each environment offers unique challenges and characteristics that make them suitable for evaluating different RL algorithms.
+**Note**: To set up hyperparameters for each environment, use ``game_setup`` function in enviroment.py. To set up rewards use function `enviroment.py>custom_reward` and to customize inputs, use ``enviroment.py>env_input_modification`` function.
+
+### Cart-Pole Environment
+
+The Cart-Pole environment is a classic benchmark in Reinforcement Learning, involving the task of balancing a pole on a moving cart.
+
+**Description:**
+- **State Space:** The state space consists of four continuous variables representing the position and velocity of the cart and pole.
+- **Action Space:** The agent can take two discrete actions: push the cart left or right.
+- **Rewards:** The standard reward function provides a reward of +1 for each time step the pole remains upright. If the pole falls or the cart moves too far from the center, the episode terminates with a reward of 0.
+
+### Maze Environment
+
+The Maze environment is a grid-world scenario where the goal is to navigate through a maze to reach a reward. It offers a discrete state and action space and is commonly used for testing RL algorithms in a discrete setting.
+
+**Description:**
+- **Grid Size:** The maze is a 5x5 grid with walls blocking certain paths.
+- **Initial States:** The agent can start from one of three initial positions: (0,0), (0,4), or (4,0).
+- **Goal:** The reward is positioned at (4,4) with a reward of +10. All other states provide a reward of -1.
+- **Obstacle:** A wall is present at position (2,2), creating a barrier that the agent must navigate around.
+
+### Lake Environment
+
+The Lake environment is another grid-world scenario focusing on navigation and risk. The agent must avoid falling into holes while aiming to reach a rewarding destination. Additionally, the environment is slippery, introducing stochasticity into the agent's actions.
+
+**Description:**
+- **Grid Size:** The Lake is a 4x4 grid.
+- **Initial State:** The agent starts at position (0,0).
+- **Holes:** There are four holes at positions (1,1), (0,3), (3,1), and (3,2). Falling into a hole terminates the episode with a reward of -5.
+- **Reward:** A high-reward state is located at (3,3) with a reward of +30. All other states provide a reward of -1 per time step.
+- **Slippery:** The environment is slippery, meaning that actions may not always lead to the intended outcome, introducing randomness into the agent's movements.
+
+### Toy Environment
+
+This environment is designed with specific mechanics to test reinforcement learning algorithms. 
+
+**Description:**
+- **State Space:** The environment consists of a set of states `S = {0,1,2, ..., m-1}`, with a randomly selected initial state.
+- **Action Space:** At each time step `t ∈ N`, the agent may choose between two actions `A = {+1, +2}`.
+- **State Transitions:** The state transitions are defined as either `S(t+1) = (S(t) + 1) mod m ∈ S` or `S(t+1) = (S(t) + 2) mod m ∈ S`.
+- **Rewards:** Correspondingly, for each pair `(a,s) ∈ A×S`, an immediate reward `r(a,s) ∈ R` is assigned.
+- **Initial State:** The agent starts at a random position on the state space. For the **env.testing=True**, two initial states `S_0 = {0,2}` are chosen randomly with a 50% chance for each.
+- **Goal** For the fixed horizon 'n', get the maximal cumulative reward.
+
+This environment, with its simple yet intricate design, allows for a comprehensive evaluation of an RL agent's ability to learn optimal policies under various state and action scenarios.
 
 ## Update 17.10.2023
 
@@ -130,21 +234,41 @@ In addition, the Toy.render() method, will prepare a plot, that shows the curren
 
 ![](images/picture2.png)
 
-### Matryoshka NET (MTRNet)
+# CK/NTK analysis
+**Note**. Only for the Toy environment.
 
-New custom ResNet. As we have already mentioned, this implementation offers a different perspective on the algorithm's implementation. Which is closer, to the idea of the original algorithm.
-We propose to try two versions (Can be found in MtrNet file):
-1. ReinforceMtrNetAgent - Agent that use non-stochastic reward and MTRNet as approximation function.
-2. MtrNetAgent - Realize Max-entropy reward, together with MTRNet approximation. (main algorithm)
+The `Ntk_analysis` class in `utils.py` provides tools for conducting analysis in the context of Neural Tangent Kernel (NTK) and Conjugate Kernel (CK). Key functionalities include:- eigen value/vector decomposition. (stored in attr: ``.eigen_vectors/.eigen_values``)
+- estimate agent's state distribution (stored in attr: ``.m``)
+- Kernel Rank (stored in attr: ``.rank``)
+- Q-values for provided Agent's policy (stored in attr: ``.Q_pi``)
+- optimal Q-values, as projection of Q_pi on the spectral decomposition of the Conjugate Kernel (stored in attr: ``.Q_opt``)
+**Note**. Optimal Q-values, can be estimated only for Original and MtrMet/MtrNet Light agents.
 
-![](images/Toy_3.jpg)
+Summary of class methods:
 
-![](images/toy.png)
+| Method                     | Description                                                                                                                 |
+|----------------------------|-----------------------------------------------------------------------------------------------------------------------------|
+| `ntk_matrix(Agent, idx_block)` | Calculates the NTK kernel matrix for a given block index of an agent. Returns a tensor of dimensions (n_inputs * n_actions, n_inputs * n_actions). |
+| `ck_matrix(Agent, idx_block)` | Calculates the Conjugate Kernel matrix for a given block index of an agent. Similar in return dimensions to `ntk_matrix`.   |
+| `ranks(mat)`               | Determines the matrix rank of a given matrix.                                                                               |
+| `decompose(mat)`           | Performs eigenvalue/vector decomposition on the provided matrix.                                                            |
+| `full_analysis(Agent)`     | Conducts a full analysis on an agent using either NTK or CK matrices. Populates attributes like eigenvalues, eigenvectors, and rank. |
+| `estimate_m(Agent, n_runs)` | Estimates the state distribution of the agent over a specified number of runs.                                              |
+| `generate_agent_policy_matrix(Agent)` | Generates a matrix representing the policy of an agent across different horizon steps.                                    |
+| `generate_Q_pi(policy, Agent, step_hor)` | Generates Q-values for a provided agent's policy. Successive calls update Q-values for increasing horizon steps.         |
+| `projection(Q, basis, pi, m)` | Computes the projection of Q-values on the spectral decomposition of the Conjugate Kernel.                                  |
+| `genarate_optimal_Q(Agent, basis)` | Generates optimal Q-values, as the projection of `Q_pi` on the spectral decomposition of the Conjugate Kernel.           |
+| `generate_optimal_policy_matrix(Agent, Q_opt)` | Generates an optimal policy matrix based on the optimal Q-values.                                                        |
+| `policy_eval(pi_agent, pi_opt)` | Evaluates the policy by comparing the agent's policy matrix with the optimal policy matrix.                                 |
 
-### Original Matryoshka Algorithm 
-
-The algorithm can be found in original.py file. Whereas, OriginalMtrAgent uses independant approximation function for each pi_i policy. 
-![](images/Toy_4.jpg)
+Usage example:
+```sh 
+ck = NTKanalysis(env, mode="ck")
+ck.full_analysis(Agent)
+ck.generate_optimal_Q(Agent)
+````
+   cd Matryoshka-Algo
+   python -m venv venv
 
 ## Update 24.10.2023
 
