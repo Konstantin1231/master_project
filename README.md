@@ -1,11 +1,12 @@
 # Matryoshka Algo
 
-**Note:** This project is a draft implementation of the Matryoshka algorithm, as described in the paper https://arxiv.org/pdf/2303.12785.pdf. Please be aware that this is a work in progress and may not be the final implementation.
+**Note:** This project is an implementation of the Matryoshka and "Shared" Matryoshka algorithms with Neural Network policy approximators. As a part of the Master's thesis, it was design to implement the experimental phase in the work ["Neural Horizons: Exploring Matryoshka Policy Gradients"](./documents/Master_project_Medyanikov.pdf) (See section 3.3 Experiments)
+ 
 
 ## Table of Contents
 - [Introduction](#introduction)
+- [File Structure](#file-structure)
 - [Download](#download)
-- 
 - [Quick start](#quick-start)
 - - [main.ipynb](#mainipynb)
 - - [Environment settings](#change-environment-settings)
@@ -28,9 +29,22 @@ In addition to the Matryoshka algorithm implementations, we have also included a
 - `ReinforceAgent (REIN)`: This class represents the implementation of the REINFORCE algorithm.
 - `MTRAgent (MTR)`: Similar to ReinforceAgent, with extra dimension for input, that used to encode the step horizon and entropy regularized reward.
 - `OriginalMtrAgent (Original)`: Parametrization consist of a number of independed blocks, each representing NN with entropy regularization. Each block, encode policy of specific horizon step.
-- `OriginalMtrAgent (Original)`:
+- `MtrNetAgent (MtrNet)`: Our novel design to realize Matroyshka features. (see more Section 3.1 "Shared NN" in ["Neural Horizons: Exploring Matryoshka Policy Gradients"](./documents/Master_project_Medyanikov.pdf))
+ 
 
+## File Structure
 
+| File/Folder Name | Description |
+| ---------------- | ----------- |
+| `main.py`        | Main script for initiating the training process. |
+| `/models`        | Contains the neural network models used in the policy gradient updates. |
+| `/environments`  | Includes the environments simulated for reinforcement learning tasks. |
+| `/agents`        | Code for the different reinforcement learning agents. |
+| `/utils`         | Utility scripts for tasks like data processing, logging, etc. |
+| `/tests`         | Unit tests to validate the functionality of the code. |
+| `requirements.txt` | Lists all the Python dependencies required for the project. |
+| `/docs`          | Additional documentation and resources. |
+| `README.md`      | This file, containing an overview and guide to the repository. |
 
 
 
@@ -53,32 +67,46 @@ To set up this repository on your local machine, follow these steps:
    
 # Quick start
  
-## main.ipynb
-Open jupyter notebook main.ipynb.\
-Select the target environment and run cell. In addition, one can choose to set env.random = True to force the random initializing point.\
-<img src=images/img_1.png  width="400" >\
-Next, we set hyperparameters for agents, including learning rate, tau, number of episodes per epoch and number of epochs. By running this cell, we will initialize agents, in other words initialize the Neural Networks, that used to parametrize their policies.\
-<img src=images/img.png  width="400" >\
+### main.ipynb
+Open jupyter notebook main.ipynb.
+Select the target environment and run cell. In addition, one can choose to set env.random = True to force the random initializing point.
+
+<img src=images/img_1.png  width="400" >
+
+Next, we set hyperparameters for agents, including learning rate, tau, number of episodes per epoch and number of epochs. By running this cell, we will initialize agents, in other words initialize the Neural Networks, that used to parametrize their policies.
+
+<img src=images/img.png  width="400" >
+
 Then, we configure the DataFrame to store results. One can use blank result.csv file for FROM_PATH, and crate new one for TO_PATH = <YOUR PATH>, where all obtained results will be dump in.
-<img src=images/img_2.png  width="400" >\
+
+<img src=images/img_2.png  width="400" >
+
 Then, one can continue by running the other cells containing training/testing loops for all agents. 
-To visualize results, we use RENDER cell, where the only variable to set: agent - agent we want render and agent.tau = the temperature factor during the game.
-<img src=images/img_4.png  width="400" >\
+To visualize results, we use RENDER cell, where the only variable to set: agent - agent we want render and agent.tau = the temperature factor during the game.\
+<img src=images/img_4.png  width="400" >
 
 
-## Change environment settings
+### Change environment settings
 In order to make more changes, one should explor environment.py file -> game_setup() function.
-Where, one can redefine any proposed constants or add new environment.\
-<img src=images/img_5.png  width="400" >\
+Where, one can redefine any proposed constants or add new environment.
 
-One can redefine default rewards using environment.py -> custom_reward() function.\
-<img src=images/img_6.png  width="400" >\
+<img src=images/img_5.png  width="400" >
+
+One can redefine default rewards using environment.py -> custom_reward() function.
+
+<img src=images/img_6.png  width="400" >
 
 
-## Change Neural Network architecture 
-By default, each Neural Network block parametrized by Feed Forward Relu NN with two hidden layers. One, can modify it changing the .Q attribute in SimpleBlock class for each design (Original in original.py, MtrMet in MtrNet.py, REIN in NeuralNet.py).\
-<img src=images/img_7.png  width="400" >\
+### Change Neural Network architecture 
+By default, each Neural Network block parametrized by Feed Forward Relu NN with two hidden layers. One, can modify it changing the .Q attribute in SimpleBlock class for each design (Original in original.py, MtrMet in MtrNet.py, REIN in NeuralNet.py).
+
+<img src=images/img_7.png  width="400" >
+
 Make sure, to keep consistency with self.output_layer.
+
+
+
+# Agents  
 
 
 
