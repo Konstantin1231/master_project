@@ -13,6 +13,7 @@
 - - [Neural Network architecture](#change-neural-network-architecture)
 - [Agents](#agents)
 - [Environments](#environments)
+- [CK/NTK analysis](#ckntk-analysis)
 - [Update 17.10.2023](#update-17102023)
 -- [Update 24-10.2023](#update-24102023)
 -- [Update 31.10.2023](#update-31102023)
@@ -228,11 +229,7 @@ The environment has three variables:
 
 The environment setup could be done in the utils.py (game_setup() function):
 
-![](images/picture1.png)
 
-In addition, the Toy.render() method, will prepare a plot, that shows the current agent's position, and highlights the next optimal action.
-
-![](images/picture2.png)
 
 # CK/NTK analysis
 **Note**. Only for the Toy environment.
@@ -267,8 +264,18 @@ ck = NTKanalysis(env, mode="ck")
 ck.full_analysis(Agent)
 ck.generate_optimal_Q(Agent)
 ````
-   cd Matryoshka-Algo
-   python -m venv venv
+
+
+
+
+
+![](images/picture1.png)
+
+In addition, the Toy.render() method, will prepare a plot, that shows the current agent's position, and highlights the next optimal action.
+
+![](images/picture2.png)
+
+
 
 ## Update 24.10.2023
 
